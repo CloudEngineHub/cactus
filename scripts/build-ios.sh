@@ -8,13 +8,13 @@ if ! command -v cmake &> /dev/null; then
 fi
 
 function cp_headers() {
-  mkdir -p "$ROOT_DIR/react/ios/cactus.xcframework/$1/cactus.framework/Headers"
-  cp "$ROOT_DIR/cactus/"*.h "$ROOT_DIR/react/ios/cactus.xcframework/$1/cactus.framework/Headers/"
-  cp "$ROOT_DIR/cactus/"*.hpp "$ROOT_DIR/react/ios/cactus.xcframework/$1/cactus.framework/Headers/"
+  mkdir -p "$ROOT_DIR/ios/cactus.xcframework/$1/cactus.framework/Headers"
+  cp "$ROOT_DIR/cactus/"*.h "$ROOT_DIR/ios/cactus.xcframework/$1/cactus.framework/Headers/"
+  cp "$ROOT_DIR/cactus/"*.hpp "$ROOT_DIR/ios/cactus.xcframework/$1/cactus.framework/Headers/"
 
-  mkdir -p "$ROOT_DIR/react/ios/cactus.xcframework/$1/cactus.framework/Headers/minja"
-  cp "$ROOT_DIR/cactus/minja/"*.hpp "$ROOT_DIR/react/ios/cactus.xcframework/$1/cactus.framework/Headers/minja/"
-  sed -i '' 's/<json.hpp>/"..\/json.hpp"/g' "$ROOT_DIR/react/ios/cactus.xcframework/$1/cactus.framework/Headers/minja/"*.hpp
+  mkdir -p "$ROOT_DIR/ios/cactus.xcframework/$1/cactus.framework/Headers/minja"
+  cp "$ROOT_DIR/cactus/minja/"*.hpp "$ROOT_DIR/ios/cactus.xcframework/$1/cactus.framework/Headers/minja/"
+  sed -i '' 's/<json.hpp>/"..\/json.hpp"/g' "$ROOT_DIR/ios/cactus.xcframework/$1/cactus.framework/Headers/minja/"*.hpp
 }
 
 function build_framework() {
@@ -28,7 +28,7 @@ function build_framework() {
   cd "$5"
 
   # Configure CMake
-  cmake "$ROOT_DIR/react/ios" \
+  cmake "$ROOT_DIR/ios" \
     -GXcode \
     -DCMAKE_SYSTEM_NAME=$1 \
     -DCMAKE_OSX_ARCHITECTURES="$2" \
@@ -41,7 +41,7 @@ function build_framework() {
   cmake --build . --config Release -j $(sysctl -n hw.logicalcpu)
 
   # Setup framework directory
-  DEST_DIR="$ROOT_DIR/react/ios/cactus.xcframework/$4"
+  DEST_DIR="$ROOT_DIR/ios/cactus.xcframework/$4"
   FRAMEWORK_SRC="Release-$3/cactus.framework"
   FRAMEWORK_DEST="$DEST_DIR/cactus.framework"
 

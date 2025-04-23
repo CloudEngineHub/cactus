@@ -31,7 +31,7 @@ fi
 
 t0=$(date +%s)
 
-cd "$ROOT_DIR/react/android/src/main"
+cd "$ROOT_DIR/android/src/main"
 
 # Build the Android library (arm64-v8a)
 cmake -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \

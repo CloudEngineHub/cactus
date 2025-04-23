@@ -12,6 +12,15 @@ end
 # base_optimizer_flags = ""
 base_optimizer_flags = "-O3 -DNDEBUG"
 
+# Check if we're in development or in an installed package
+if File.exist?('../ios')
+  # Development environment
+  ios_path = '../ios'
+else
+  # Installed as a package
+  ios_path = 'ios'
+end
+
 Pod::Spec.new do |s|
   s.name         = "cactus-rn-2"
   s.version      = package["version"]
@@ -23,8 +32,8 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "13.0", :tvos => "13.0" }
   s.source       = { :git => "https://github.com/cactus-compute/cactus.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm}"
-  s.vendored_frameworks = "ios/cactus.xcframework"
+  s.source_files = "#{ios_path}/**/*.{h,m,mm}"
+  s.vendored_frameworks = "#{ios_path}/cactus.xcframework"
 
   s.dependency "React-Core"
 

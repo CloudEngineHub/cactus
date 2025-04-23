@@ -4,7 +4,7 @@ project(cactus)
 
 set(CMAKE_CXX_STANDARD 17)
 # Use cactus as the C++ source directory
-set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../../../cactus)
+set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../../cactus)
 
 include_directories(${SOURCE_DIR})
 

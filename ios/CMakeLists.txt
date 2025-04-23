@@ -19,7 +19,7 @@ add_definitions(
 )
 
 # Set the source directory to the cactus directory
-set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../cactus)
+set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../cactus)
 
 # Define public headers
 set(PUBLIC_HEADERS
@@ -84,7 +84,7 @@ add_library(cactus SHARED
 # Setup include directories, use the cactus directory
 target_include_directories(cactus
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../cactus>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../cactus>
         $<INSTALL_INTERFACE:include>
 )
 

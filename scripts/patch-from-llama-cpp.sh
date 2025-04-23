@@ -283,10 +283,7 @@ if [ "$OS" = "Darwin" ]; then
   rm ggml-common.h
 
   cd -
-
-  # # Generate .xcode.env.local in iOS example
-  # cd example/ios
-  # echo export NODE_BINARY=$(command -v node) > .xcode.env.local
+  
 fi
 
 # after we're finished, remove the temporary clone to keep the tree clean
