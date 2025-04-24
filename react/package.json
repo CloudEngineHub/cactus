@@ -1,6 +1,6 @@
 {
   "name": "cactus-rn",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Cactus framework running AI models locallyon phones",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
