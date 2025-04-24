@@ -22,7 +22,7 @@ else
 end
 
 Pod::Spec.new do |s|
-  s.name         = "cactus-rn"
+  s.name         = "cactus-rn-2"
   s.version      = package["version"]
   s.summary      = package["description"]
   s.homepage     = package["homepage"]
