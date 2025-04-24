@@ -30,6 +30,8 @@ build/
 coverage/
 *.tsbuildinfo
 react/lib/
+react/ios
+react/android
 
 # Metro/React Native cache
 .cache/
