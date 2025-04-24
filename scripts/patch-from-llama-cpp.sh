@@ -251,15 +251,15 @@ echo "Replacement completed successfully!"
 # yarn --cwd example
 
 # Apply patch
-patch -p0 -d ./cactus < ./patches/common.h.patch
-patch -p0 -d ./cactus < ./patches/common.cpp.patch
-patch -p0 -d ./cactus < ./patches/chat.h.patch
-patch -p0 -d ./cactus < ./patches/chat.cpp.patch
-patch -p0 -d ./cactus < ./patches/log.cpp.patch
-patch -p0 -d ./cactus < ./patches/ggml-metal.m.patch
-patch -p0 -d ./cactus < ./patches/ggml.c.patch
-patch -p0 -d ./cactus < ./patches/ggml-quants.c.patch
-patch -p0 -d ./cactus < ./patches/llama-mmap.cpp.patch
+patch -p0 -d ./cactus < ./cactus/patches/common.h.patch
+patch -p0 -d ./cactus < ./cactus/patches/common.cpp.patch
+patch -p0 -d ./cactus < ./cactus/patches/chat.h.patch
+patch -p0 -d ./cactus < ./cactus/patches/chat.cpp.patch
+patch -p0 -d ./cactus < ./cactus/patches/log.cpp.patch
+patch -p0 -d ./cactus < ./cactus/patches/ggml-metal.m.patch
+patch -p0 -d ./cactus < ./cactus/patches/ggml.c.patch
+patch -p0 -d ./cactus < ./cactus/patches/ggml-quants.c.patch
+patch -p0 -d ./cactus < ./cactus/patches/llama-mmap.cpp.patch
 rm -rf ./cactus/*.orig
 
 if [ "$OS" = "Darwin" ]; then

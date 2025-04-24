@@ -1,1 +1,3 @@
-![Logo](assets/logo.jpg)
+![Logo](assets/banner.jpg)
+
+
