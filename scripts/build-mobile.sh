@@ -1,8 +1,10 @@
 # Build the React Native package
 cd react 
 
-# Remove existing directories if they exist
-rm -rf ios android
+# Remove directories if they still exist
+[ -d ios ] && rm -rf ios
+[ -d android ] && rm -rf android
+[ -d node_modules ] && rm -rf node_modules
 
 # Copy the ios and android directories
 cp -R ../ios ios
