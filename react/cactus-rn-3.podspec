@@ -12,17 +12,11 @@ end
 # base_optimizer_flags = ""
 base_optimizer_flags = "-O3 -DNDEBUG"
 
-# Check if we're in development or in an installed package
-if File.exist?('../ios')
-  # Development environment
-  ios_path = '../ios'
-else
-  # Installed as a package
-  ios_path = 'ios'
-end
+# We always use the local ios directory since we're now copying the files
+ios_path = 'ios'
 
 Pod::Spec.new do |s|
-  s.name         = "cactus-rn-2"
+  s.name         = "cactus-rn-3"
   s.version      = package["version"]
   s.summary      = package["description"]
   s.homepage     = package["homepage"]
@@ -48,4 +42,4 @@ Pod::Spec.new do |s|
   if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
     install_modules_dependencies(s)
   end
-end
+end 
