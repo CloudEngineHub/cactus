@@ -1,4 +1,4 @@
-import { initLlama, LlamaContext } from "cactus-rn-3";
+import { initLlama, LlamaContext } from "cactus-rn";
 import { Platform } from "react-native";
 import * as FileSystem from 'expo-file-system';
 
