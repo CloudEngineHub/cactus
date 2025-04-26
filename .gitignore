@@ -30,14 +30,14 @@ build/
 coverage/
 *.tsbuildinfo
 react/lib/
-react/ios
-react/android
 
 # Metro/React Native cache
 .cache/
 react-native-packager-cache-*/
 __generated__/
 .expo-shared/
+react/ios/cactus.xcframework/
+react/ios/Cactus.xcodeproj/
 
 # iOS
 ios/Pods/
