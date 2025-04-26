@@ -143,3 +143,7 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+
+# === Swift ===
+swift/Source/cactus.xcframework/
