@@ -65,13 +65,5 @@ cp build-x86_64/*.so jniLibs/x86_64/
 
 rm -rf build-x86_64
 
-# copy jniLibs to kotlin
-cp -R jniLibs kotlin/
-
-# copy to flutter
-cp -R jniLibs flutter/
-
-rm -rf android
-
 t1=$(date +%s)
 echo "Total time: $((t1 - t0)) seconds"
