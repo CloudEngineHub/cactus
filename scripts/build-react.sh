@@ -7,7 +7,7 @@ cd react
 [ -d node_modules ] && rm -rf node_modules
 
 # Copy the ios and android directories
-cp -R ../ios ios
+cp -R ../ios/* ios
 cp -R ../android android
 
 yarn 
