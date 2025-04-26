@@ -1,0 +1,5 @@
+   framework module CactusSwift {
+     umbrella header "CactusSwift.h"
+     export *
+     module * { export * }
+   }

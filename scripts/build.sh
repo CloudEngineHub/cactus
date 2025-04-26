@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/patch-from-llama-cpp.sh"
 
 # 2. Run test
-"$SCRIPT_DIR/test_cactus.sh"
+"$SCRIPT_DIR/test-cactus.sh"
 
 # 3. Build native iOS (and tvOS) frameworks
 "$SCRIPT_DIR/build-ios.sh"
@@ -18,6 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/build-android.sh"
 
 # 5. Build the React‑Native JS package (TS ➜ JS, etc.)
-"$SCRIPT_DIR/build-mobile.sh"
+"$SCRIPT_DIR/build-react.sh"
+
+# 6. Build the Swift package
+"$SCRIPT_DIR/build-swift.sh"
 
  echo "All build steps completed successfully."
