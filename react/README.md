@@ -72,26 +72,6 @@ const result = await context.completion({
 
 ## Advanced Features
 
-### Downloading Models
-
-Cactus supports downloading models from HuggingFace:
-
-```typescript
-import { downloadModelIfNotExists } from 'cactus-rn';
-
-// Download a model if it doesn't exist locally
-const modelPath = await downloadModelIfNotExists({
-  modelUrl: 'https://huggingface.co/unsloth/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q8_0.gguf',
-  modelFolderName: 'models',
-  onProgress: (progress) => {
-    console.log(`Download progress: ${progress}%`);
-  },
-  onSuccess: (path) => {
-    console.log(`Model downloaded to: ${path}`);
-  }
-});
-```
-
 ### JSON Mode with Schema Validation
 
 ```typescript
@@ -240,7 +220,7 @@ A complete chat application with Cactus:
 ```typescript
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet } from 'react-native';
-import { initLlama, LlamaContext, downloadModelIfNotExists } from 'cactus-rn';
+import { initLlama, LlamaContext } from 'cactus-rn';
 
 const ChatApp = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -256,15 +236,9 @@ const ChatApp = () => {
     // Initialize model on component mount
     const initModel = async () => {
       try {
-        // Download model if not exists
-        const modelPath = await downloadModelIfNotExists({
-          modelUrl: 'https://huggingface.co/unsloth/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q8_0.gguf',
-          onProgress: (progress) => console.log(`Download progress: ${progress}%`)
-        });
-        
         // Initialize model
         const ctx = await initLlama({
-          model: modelPath,
+          model: 'models/llama-2-7b-chat.gguf',
           n_ctx: 2048,
           n_batch: 512,
           n_threads: 4
