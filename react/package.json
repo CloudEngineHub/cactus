@@ -1,5 +1,5 @@
 {
-  "name": "cactus-react-native-tes",
+  "name": "cactus-react-native",
   "version": "0.0.1",
   "description": "Run AI models locally on mobile devices",
   "main": "lib/commonjs/index",
@@ -11,6 +11,7 @@
     "src",
     "lib",
     "ios",
+    "ios/CMakeLists.txt",
     "android",
     "*.podspec",
     "!ios/build",

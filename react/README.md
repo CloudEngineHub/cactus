@@ -1,5 +1,7 @@
 # Cactus for React Native
 
+A lightweight, high-performance framework for running AI models on mobile devices with React Native.
+
 ## Installation
 
 ```bash
@@ -18,7 +20,7 @@ npx pod-install
 ### Initialize a Model
 
 ```typescript
-import { initLlama, LlamaContext } from 'cactus-rn';
+import { initLlama, LlamaContext } from 'cactus-react-native';
 
 // Initialize the model
 const context = await initLlama({
@@ -164,7 +166,7 @@ console.log(`Model size: ${benchResult.modelSize} bytes`);
 ### Native Logging
 
 ```typescript
-import { addNativeLogListener, toggleNativeLog } from 'cactus-rn';
+import { addNativeLogListener, toggleNativeLog } from 'cactus-react-native';
 
 // Enable native logging
 await toggleNativeLog(true);
@@ -215,159 +217,13 @@ try {
 
 ## Example App
 
-A complete chat application with Cactus:
+For a complete working example, check out the [React Native example app](https://github.com/cactus-compute/cactus/tree/main/examples/react-example) in the repository.
 
-```typescript
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet } from 'react-native';
-import { initLlama, LlamaContext } from 'cactus-rn';
-
-const ChatApp = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [context, setContext] = useState(null);
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([
-    { role: 'system', content: 'You are a helpful assistant.' }
-  ]);
-  const [currentResponse, setCurrentResponse] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  useEffect(() => {
-    // Initialize model on component mount
-    const initModel = async () => {
-      try {
-        // Initialize model
-        const ctx = await initLlama({
-          model: 'models/llama-2-7b-chat.gguf',
-          n_ctx: 2048,
-          n_batch: 512,
-          n_threads: 4
-        });
-        
-        setContext(ctx);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error initializing model:', error);
-      }
-    };
-
-    initModel();
-
-    // Cleanup on component unmount
-    return () => {
-      if (context) {
-        context.release();
-      }
-    };
-  }, []);
-
-  const sendMessage = async () => {
-    if (!input.trim() || isGenerating) return;
-    
-    const userMessage = { role: 'user', content: input };
-    setMessages([...messages, userMessage]);
-    setInput('');
-    setIsGenerating(true);
-    setCurrentResponse('');
-    
-    try {
-      const newMessages = [...messages, userMessage];
-      
-      await context.completion({
-        messages: newMessages,
-        temperature: 0.7,
-        top_p: 0.95,
-        n_predict: 512
-      }, (token) => {
-        setCurrentResponse(prev => prev + token.token);
-      });
-      
-      // Add assistant response to messages
-      setMessages([
-        ...newMessages, 
-        { role: 'assistant', content: currentResponse }
-      ]);
-    } catch (error) {
-      console.error('Error generating response:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  if (isLoading) {
-    return <View style={styles.container}><Text>Loading model...</Text></View>;
-  }
-
-  return (
-    <View style={styles.container}>
-      <FlatList
-        data={[...messages.slice(1), isGenerating ? { role: 'assistant', content: currentResponse } : null].filter(Boolean)}
-        keyExtractor={(_, index) => index.toString()}
-        renderItem={({ item }) => (
-          <View style={[
-            styles.messageBubble,
-            item.role === 'user' ? styles.userBubble : styles.assistantBubble
-          ]}>
-            <Text>{item.content}</Text>
-          </View>
-        )}
-      />
-      
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Type a message..."
-          disabled={isGenerating}
-        />
-        <Button
-          title="Send"
-          onPress={sendMessage}
-          disabled={isGenerating || !input.trim()}
-        />
-      </View>
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-  },
-  messageBubble: {
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 5,
-    maxWidth: '80%',
-  },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#DCF8C6',
-  },
-  assistantBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#ECECEC',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#CCCCCC',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
-  },
-});
-
-export default ChatApp;
-```
+This example demonstrates:
+- Loading and initializing models
+- Building a chat interface
+- Streaming responses
+- Proper resource management
 
 ## License
 

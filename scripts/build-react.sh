@@ -14,7 +14,6 @@ echo "Copying iOS frameworks and Android libraries to React Native project..."
 
 # Copy the iOS framework and project files
 cp -R "$ROOT_DIR/ios/cactus.xcframework" ios/ 
-cp -R "$ROOT_DIR/ios/Cactus.xcodeproj" ios/ 
 cp -R "$ROOT_DIR/ios/CMakelists.txt" ios/ 
 
 # Copy the contents of android/src/main into react/android/src/main
