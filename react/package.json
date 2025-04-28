@@ -1,7 +1,7 @@
 {
-  "name": "cactus-rn",
-  "version": "0.0.2",
-  "description": "Cactus framework running AI models locallyon phones",
+  "name": "cactus-react-native-test",
+  "version": "0.0.1",
+  "description": "Run AI models locally on mobile devices",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
   "types": "lib/typescript/index.d.ts",
@@ -22,7 +22,8 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
-    "!**/.*"
+    "!**/.*",
+    "!ios/*.xcodeproj"
   ],
   "scripts": {
     "build": "bob build",
