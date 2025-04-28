@@ -4,13 +4,13 @@
 
 ```bash
 # Using npm
-npm install cactus-rn
+npm install cactus-react-native
 
 # Using yarn
-yarn add cactus-rn
+yarn add cactus-react-native
 
-# For iOS, install pods
-cd ios && pod install
+# For iOS, install pods if not on Expo
+npx pod-install
 ```
 
 ## Basic Usage
