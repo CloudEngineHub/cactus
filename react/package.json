@@ -1,6 +1,6 @@
 {
   "name": "cactus-react-native",
-  "version": "0.0.3",
+  "version": "0.0.1",
   "description": "Run AI models locally on mobile devices",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -31,7 +31,7 @@
     "docgen": "typedoc src/index.ts --plugin typedoc-plugin-markdown --readme none --out docs/API",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "release": "release-it"
+    "release": "release-it --ci"
   },
   "keywords": [
     "react-native",
