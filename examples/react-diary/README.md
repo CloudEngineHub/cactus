@@ -1,6 +1,6 @@
-# Cactus React Native Chat Example (Expo)
+# Cactus React Native Diary Example (Expo)
 
-A simple chat application built with React Native and Expo, demonstrating how to use the Cactus framework for on-device conversational AI.
+A simple diary/journaling application built with React Native and Expo, showcasing the use of the Cactus framework within a mobile application, potentially for summarization, reflection prompts, or other on-device text processing tasks.
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@ A simple chat application built with React Native and Expo, demonstrating how to
 
 ## Getting Started
 
-1.  **Clone the repository** (if you haven't already) or navigate to this example directory (`examples/react-chat`).
+1.  **Clone the repository** (if you haven't already) or navigate to this example directory (`examples/react-diary`).
 
 2.  **Install dependencies:**
     ```bash
@@ -39,7 +39,7 @@ A simple chat application built with React Native and Expo, demonstrating how to
 
 ## Usage
 
-Interact with the chat interface. Type messages and see how the Cactus framework processes input and generates responses.
+Use the application to write diary entries. Observe how the Cactus framework might be integrated for features related to on-device text analysis or interaction.
 
 ## Copy & Deploy
 
