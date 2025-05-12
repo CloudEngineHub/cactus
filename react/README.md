@@ -6,9 +6,11 @@ A lightweight, high-performance framework for running AI models on mobile device
 
 ```bash
 # Using npm
+npm install react-native-fs
 npm install cactus-react-native
 
 # Using yarn
+yarn add react-native-fs
 yarn add cactus-react-native
 
 # For iOS, install pods if not on Expo
