@@ -16,8 +16,6 @@ export LEFTHOOK=0
 cd "$ROOT_DIR/cactus-react" 
 
 echo "Copying iOS frameworks to React Native project..."
-
-# Copy the iOS framework and project files
 rm -rf ios/cactus.xcframework
 cp -R "$ROOT_DIR/cactus-ios"/cactus.xcframework ios/
 cp -R "$ROOT_DIR/cactus-ios"/CMakeLists.txt ios/
