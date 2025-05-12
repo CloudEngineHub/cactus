@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Navigate to the project root based on the script location
 PROJECT_ROOT="$SCRIPT_DIR/.."
-ANDROID_DIR="$PROJECT_ROOT/android"
+ANDROID_DIR="$PROJECT_ROOT/cactus-android"
 
 echo "Navigating to $ANDROID_DIR"
 cd "$ANDROID_DIR"

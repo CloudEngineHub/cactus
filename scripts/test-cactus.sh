@@ -1,4 +1,4 @@
-cd tests
+cd cactus-tests
 mkdir -p build
 cd build
 cmake ..

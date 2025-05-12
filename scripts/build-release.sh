@@ -53,7 +53,7 @@ echo "All build steps completed successfully."
 # Release the React Native package if flag is set
 if [ "$release_react" = true ]; then
   echo "Releasing React Native package..."
-  cd "$ROOT_DIR/react"
+  cd "$ROOT_DIR/cactus-react"
   yarn release
   cd ..
 fi
@@ -74,7 +74,7 @@ fi
 
 if [ "$release_android" = true ]; then
   echo "Releasing Android library..."
-  cd "$ROOT_DIR/android"
+  cd "$ROOT_DIR/cactus-android"
   ./gradlew publishReleasePublicationToGitHubPackagesRepository
   cd ..
 fi
