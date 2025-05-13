@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:io'; 
 import 'package:path_provider/path_provider.dart'; 
 
-import 'package:cactus_flutter/cactus_flutter.dart';
+import 'package:cactus/cactus.dart';
 
 void main() {
   runApp(const MyApp());
