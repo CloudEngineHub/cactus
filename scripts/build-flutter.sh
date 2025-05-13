@@ -14,6 +14,6 @@ cp -R "$ROOT_DIR/cactus-ios"/CMakeLists.txt ios/
 echo "Building Cactus Flutter Plugin..."
 flutter clean
 flutter pub get
-flutter build
+dart analyze
 
 echo "Build completed successfully."
