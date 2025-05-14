@@ -6,9 +6,11 @@ Each subdirectory is a self-contained project showcasing how to integrate and us
 
 ## Available Examples
 
+*   **`flutter-chat/`**: A Flutter chat application demonstrating text completion and streaming with Cactus, suitable for cross-platform (iOS & Android) mobile development.
 *   **`android_chat/`**: A native Android chat application demonstrating text completion with Cactus in a Kotlin-based Android project.
 *   **`react-chat/`**: A React Native chat application showcasing how to use Cactus for cross-platform mobile AI, enabling chat functionalities.
 *   **`react-diary/`**: A React Native diary application that might leverage Cactus for summarization, sentiment analysis, or other text-based AI features within a personal journaling context.
+*   **`react-productivity/`**: A React Native productivity application potentially using Cactus for AI-assisted task management, note-taking, or other productivity-enhancing features.
 
 ## Getting Started
 
