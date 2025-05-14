@@ -44,8 +44,8 @@ cmake --build build-arm64 --config Release -j "$n_cpu"
 
 mkdir -p jniLibs/arm64-v8a
 
-# Copy the library to the jniLibs folder
-cp build-arm64/*.so jniLibs/arm64-v8a/
+# Copy ONLY the main libcactus.so to the jniLibs folder
+cp build-arm64/libcactus.so jniLibs/arm64-v8a/
 
 rm -rf build-arm64
 
@@ -60,8 +60,8 @@ cmake --build build-x86_64 --config Release -j "$n_cpu"
 
 mkdir -p jniLibs/x86_64
 
-# Copy the library to the jniLibs folder
-cp build-x86_64/*.so jniLibs/x86_64/
+# Copy ONLY the main libcactus.so to the jniLibs folder
+cp build-x86_64/libcactus.so jniLibs/x86_64/
 
 rm -rf build-x86_64
 
