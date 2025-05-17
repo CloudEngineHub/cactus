@@ -1,9 +1,6 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "Building Android JNILibs..."
-"$SCRIPT_DIR/build-flutter-android.sh"
-
 cd "$ROOT_DIR/cactus-flutter"
 
 echo "Copying iOS frameworks to Flutter project..."
