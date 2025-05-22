@@ -3,6 +3,8 @@ import 'dart:async';
 import 'dart:convert'; 
 import 'dart:io'; 
 import 'package:path_provider/path_provider.dart'; 
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:typed_data';
 
 import 'package:cactus/cactus.dart';
 
@@ -25,6 +27,8 @@ class _MyAppState extends State<MyApp> {
   String _statusMessage = 'Initializing...'; 
   String _initError = '';
   double? _downloadProgress; 
+  String? _imagePathForNextMessage;
+  String? _stagedAssetPath;
 
   final ScrollController _scrollController = ScrollController(); 
 
@@ -43,13 +47,74 @@ class _MyAppState extends State<MyApp> {
     });
 
     try {
+      const String modelUrl = 'https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf'; 
+      const String modelFilename = 'SmolVLM-256M-Instruct-Q8_0.gguf'; 
+      const String mmprojUrl = 'https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf';
+      const String mmprojFilename = "mmproj-SmolVLM-256M-Instruct-Q8_0.gguf";
+
+      final Directory appDocDir = await getApplicationDocumentsDirectory();
+      final String effectiveModelPath = '${appDocDir.path}/$modelFilename';
+      final String effectiveMmprojPath = '${appDocDir.path}/$mmprojFilename';
+
+      // Download main model
+      final modelFile = File(effectiveModelPath);
+      if (!await modelFile.exists()) {
+        setState(() {
+          _statusMessage = 'Downloading main model...';
+          _downloadProgress = 0.0;
+        });
+        await downloadModel(
+          modelUrl,
+          effectiveModelPath,
+          onProgress: (progress, status) {
+            setState(() {
+              _downloadProgress = progress;
+              _statusMessage = "Main Model: $status";
+            });
+          },
+        );
+      } else {
+        setState(() {
+          _statusMessage = 'Main model found locally.';
+        });
+      }
+
+      // Download multimodal projector
+      final mmprojFile = File(effectiveMmprojPath);
+      if (!await mmprojFile.exists()) {
+        setState(() {
+          _statusMessage = 'Downloading multimodal projector...';
+          _downloadProgress = 0.0; // Reset progress for the new download
+        });
+        await downloadModel(
+          mmprojUrl,
+          effectiveMmprojPath,
+          onProgress: (progress, status) {
+            setState(() {
+              _downloadProgress = progress;
+              _statusMessage = "MM Projector: $status";
+            });
+          },
+        );
+      } else {
+        setState(() {
+          _statusMessage = 'Multimodal projector found locally.';
+        });
+      }
+      
+      setState(() {
+        _statusMessage = 'Initializing native context...';
+        _downloadProgress = null; // Clear progress before native init
+      });
+
       final params = CactusInitParams(
-        modelUrl: 'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf', 
-        modelFilename: 'SmolLM2-360M-Instruct.gguf', 
+        modelPath: effectiveModelPath, 
+        mmprojPath: effectiveMmprojPath,
+        gpuLayers: 0,
         onInitProgress: (progress, status, isError) {
           setState(() {
-            _downloadProgress = progress;
-            _statusMessage = status;
+            // _downloadProgress = progress; // Progress here is for native init, not download
+            _statusMessage = "Native Init: $status";
             if (isError) {
               _initError = status;
               _isLoading = false;
@@ -107,7 +172,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _sendMessage() async {
     final userInput = _promptController.text.trim();
-    if (userInput.isEmpty) return;
+    if (userInput.isEmpty && _imagePathForNextMessage == null) return;
 
     if (_cactusContext == null) {
       setState(() {
@@ -117,13 +182,26 @@ class _MyAppState extends State<MyApp> {
     }
 
     String currentAssistantResponse = "";
+    final userMessageContent = _imagePathForNextMessage != null 
+        ? "<__image__>\n$userInput" 
+        : userInput;
+
+    final userMessage = ChatMessage(
+        role: 'user', 
+        content: userMessageContent,
+    );
 
     setState(() {
-      _chatMessages.add(ChatMessage(role: 'user', content: userInput));
+      _chatMessages.add(userMessage);
       _chatMessages.add(ChatMessage(role: 'assistant', content: currentAssistantResponse)); 
       _isLoading = true;
     });
+    final String? imagePathToSend = _imagePathForNextMessage;
     _promptController.clear();
+    setState(() {
+      _imagePathForNextMessage = null;
+      _stagedAssetPath = null;
+    });
     _scrollToBottom();
 
     try {
@@ -136,6 +214,7 @@ class _MyAppState extends State<MyApp> {
       
       final completionParams = CactusCompletionParams(
         messages: currentChatHistoryForCompletion, 
+        imagePath: imagePathToSend,
         stopSequences: ['<|im_end|>'], 
         temperature: 0.7,
         topK: 10,
@@ -308,26 +387,81 @@ class _MyAppState extends State<MyApp> {
             if (_cactusContext != null && _initError.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _promptController,
-                        decoration: const InputDecoration(
-                          hintText: 'Type your message...',
-                          border: OutlineInputBorder(),
+                    if (_imagePathForNextMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
+                          children: [
+                            Image.asset(
+                              _imagePathForNextMessage!,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text("Image staged"),
+                            IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _imagePathForNextMessage = null;
+                                  _stagedAssetPath = null;
+                                });
+                              },
+                            )
+                          ],
                         ),
-                        onSubmitted: (_) => _isLoading ? null : _sendMessage(),
-                        minLines: 1,
-                        maxLines: 3,
-                        enabled: !_isLoading,
                       ),
-                    ),
-                    IconButton(
-                      icon: _isLoading && !(_chatMessages.isEmpty && _isLoading)
-                          ? const SizedBox(width:24, height:24, child:CircularProgressIndicator(strokeWidth: 2,))
-                          : const Icon(Icons.send),
-                      onPressed: _isLoading ? null : _sendMessage, 
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.image, color: _stagedAssetPath != null ? Theme.of(context).primaryColor : null),
+                          onPressed: _isLoading ? null : () async {
+                            if (_stagedAssetPath == null) {
+                              const String assetPath = 'assets/image.jpg';
+                              try {
+                                final ByteData assetData = await rootBundle.load(assetPath);
+                                final Directory tempDir = await getTemporaryDirectory();
+                                final String tempFilePath = '${tempDir.path}/temp_chat_image.jpg'; 
+                                final File tempFile = File(tempFilePath);
+                                await tempFile.writeAsBytes(assetData.buffer.asUint8List(), flush: true);
+                                setState(() {
+                                  _imagePathForNextMessage = tempFilePath;
+                                  _stagedAssetPath = assetPath;
+                                });
+                              } catch (e) {
+                                print("Error staging image from asset: $e");
+                              }
+                            } else {
+                              setState(() {
+                                _imagePathForNextMessage = null;
+                                _stagedAssetPath = null;
+                              });
+                            }
+                          },
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _promptController,
+                            decoration: const InputDecoration(
+                              hintText: 'Type your message...',
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (_) => _isLoading ? null : _sendMessage(),
+                            minLines: 1,
+                            maxLines: 3,
+                            enabled: !_isLoading,
+                          ),
+                        ),
+                        IconButton(
+                          icon: _isLoading && !(_chatMessages.isEmpty && _isLoading)
+                              ? const SizedBox(width:24, height:24, child:CircularProgressIndicator(strokeWidth: 2,))
+                              : const Icon(Icons.send),
+                          onPressed: _isLoading ? null : _sendMessage, 
+                        ),
+                      ],
                     ),
                   ],
                 ),

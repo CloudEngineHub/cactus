@@ -15,11 +15,22 @@ include_directories(
 
 add_subdirectory(../../cactus ${CMAKE_BINARY_DIR}/cactus_core_build)
 
-add_executable(cactus_vlm 
-    main.cpp
+# Executable for the FFI example
+add_executable(cactus_vlm_ffi 
+    main_ffi.cpp
 )
 
-target_link_libraries(cactus_vlm
+target_link_libraries(cactus_vlm_ffi
+    PRIVATE
+    cactus_core_lib
+)
+
+# Executable for the Core API example
+add_executable(cactus_vlm_core
+    main_core.cpp
+)
+
+target_link_libraries(cactus_vlm_core
     PRIVATE
     cactus_core_lib
 )
