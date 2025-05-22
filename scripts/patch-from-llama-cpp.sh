@@ -1,8 +1,6 @@
 # !/bin/bash -e
 # N/B: chat-template.hpp and minja.hpp are diverged
 
-yarn --cwd react
-
 # fetch llama.cpp at a fixed commit instead of using a submodule
 LLAMA_CPP_COMMIT=ceda28ef8e310a8dee60bf275077a3eedae8e36c
 LLAMA_CPP_DIR=llama.cpp
