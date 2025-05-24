@@ -42,11 +42,6 @@ cmake -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
 
 cmake --build build-arm64 --config Release -j "$n_cpu"
 
-mkdir -p jniLibs/arm64-v8a
-
-# Copy ONLY the main libcactus.so to the jniLibs folder
-cp build-arm64/libcactus.so jniLibs/arm64-v8a/
-
 rm -rf build-arm64
 
 # Build the Android library (x86_64)
@@ -57,11 +52,6 @@ cmake -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
   -B build-x86_64
 
 cmake --build build-x86_64 --config Release -j "$n_cpu"
-
-mkdir -p jniLibs/x86_64
-
-# Copy ONLY the main libcactus.so to the jniLibs folder
-cp build-x86_64/libcactus.so jniLibs/x86_64/
 
 rm -rf build-x86_64
 
