@@ -59,12 +59,11 @@ int main(int argc, char **argv) {
     params.model.path = model_filename;
     params.mmproj.path = mmproj_filename;
     params.image.push_back("../image.jpg"); 
-    params.prompt = "USER: <__image__>\nDescribe this image in detail.\nASSISTANT:";
+    params.prompt = "Describe this image in detail.";
     
     params.n_predict = 100;
     params.n_ctx = 2048;
     params.n_batch = 512;
-    params.cpuparams.n_threads = 4;
     params.use_mmap = true;
     params.warmup = false;
 

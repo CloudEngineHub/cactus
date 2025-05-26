@@ -59,7 +59,6 @@ int main(int argc, char **argv) {
     params.mmproj_path = mmproj_filename_str.c_str();
     params.n_ctx = 2048;
     params.n_batch = 512;
-    params.n_threads = 4;
     params.use_mmap = true;
     params.use_mlock = true;
     params.warmup = false; 
@@ -69,7 +68,7 @@ int main(int argc, char **argv) {
     assert(ctx_handle != nullptr && "Failed to initialize cactus context");
 
     cactus_completion_params_c_t comp_params = {};
-    std::string prompt_str = "USER: <__image__>\nDescribe this image in detail.\nASSISTANT:";
+    std::string prompt_str = "Describe this image in detail.";
     std::string image_path_str = "../image.jpg";
     comp_params.prompt = prompt_str.c_str();
     comp_params.image_path = image_path_str.c_str();
