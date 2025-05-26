@@ -8,6 +8,9 @@ CMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/$NDK_VERSION/build/cmake/android.toolchai
 ANDROID_PLATFORM=android-21
 CMAKE_BUILD_TYPE=Release
 
+# The CMakeLists.txt we are building is inside cactus-flutter/android/src/main
+FLUTTER_PLUGIN_ANDROID_MAIN_SRC_DIR="$ROOT_DIR/android/src/main"
+
 if [ ! -d "$ANDROID_HOME/ndk/$NDK_VERSION" ]; then
   echo "NDK $NDK_VERSION not found, available versions: $(ls $ANDROID_HOME/ndk)"
   echo "Run \$ANDROID_HOME/tools/bin/sdkmanager \"ndk;$NDK_VERSION\""
@@ -31,30 +34,58 @@ fi
 
 t0=$(date +%s)
 
-cd "$ROOT_DIR/android/src/main"
+cd "$FLUTTER_PLUGIN_ANDROID_MAIN_SRC_DIR"
 
-# Build the Android library (arm64-v8a)
+# --- ARM64 Build ---
+ABI_ARM64="arm64-v8a"
+BUILD_DIR_ARM64="build-arm64"
+JNI_DEST_DIR_ARM64="jniLibs/$ABI_ARM64"
+
+echo "Building for $ABI_ARM64..."
+# CMakeLists.txt is in the current directory ($FLUTTER_PLUGIN_ANDROID_MAIN_SRC_DIR)
 cmake -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
-  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_ABI="$ABI_ARM64" \
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
   -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
-  -B build-arm64
+  -S . \
+  -B "$BUILD_DIR_ARM64"
 
-cmake --build build-arm64 --config Release -j "$n_cpu"
+cmake --build "$BUILD_DIR_ARM64" --config "$CMAKE_BUILD_TYPE" -j "$n_cpu"
 
-rm -rf build-arm64
+echo "Copying $ABI_ARM64 libraries..."
+mkdir -p "$JNI_DEST_DIR_ARM64"
+# Assuming CMakeLists.txt generates libcactus.so and other variants directly in the build directory
+# Based on the react-native CMakeLists.txt, it can produce multiple .so files.
+# We'll copy all .so files produced.
+cp "$BUILD_DIR_ARM64"/lib*.so "$JNI_DEST_DIR_ARM64/"
 
-# Build the Android library (x86_64)
+rm -rf "$BUILD_DIR_ARM64"
+echo "$ABI_ARM64 build and copy complete."
+
+
+# --- x86_64 Build ---
+ABI_X86_64="x86_64"
+BUILD_DIR_X86_64="build-x86_64"
+JNI_DEST_DIR_X86_64="jniLibs/$ABI_X86_64"
+
+echo "Building for $ABI_X86_64..."
 cmake -DCMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN_FILE" \
-  -DANDROID_ABI=x86_64 \
+  -DANDROID_ABI="$ABI_X86_64" \
   -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
   -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
-  -B build-x86_64
+  -S . \
+  -B "$BUILD_DIR_X86_64"
 
-cmake --build build-x86_64 --config Release -j "$n_cpu"
+cmake --build "$BUILD_DIR_X86_64" --config "$CMAKE_BUILD_TYPE" -j "$n_cpu"
 
-rm -rf build-x86_64
+echo "Copying $ABI_X86_64 libraries..."
+mkdir -p "$JNI_DEST_DIR_X86_64"
+cp "$BUILD_DIR_X86_64"/lib*.so "$JNI_DEST_DIR_X86_64/"
+
+rm -rf "$BUILD_DIR_X86_64"
+echo "$ABI_X86_64 build and copy complete."
+
 
 t1=$(date +%s)
 echo "Total time: $((t1 - t0)) seconds"
-echo "Native libraries successfully built in $ROOT_DIR/android/src/main/jniLibs"
+echo "Native libraries successfully built and copied to $FLUTTER_PLUGIN_ANDROID_MAIN_SRC_DIR/jniLibs"
