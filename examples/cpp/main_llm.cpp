@@ -7,75 +7,111 @@
 #include <cstring>
 #include <thread>
 #include <chrono>
+#include <iomanip>
 
 #include "utils.h"
 #include "../../cactus/cactus.h"
 
-std::string generateText(cactus::cactus_context& context, const std::string& prompt, int max_tokens = 100) {
+// Include nlohmann json for proper JSON handling
+#include "../../cactus/json.hpp"
+using json = nlohmann::ordered_json;
+
+struct GenerationResult {
+    std::string text;
+    std::chrono::milliseconds time_to_first_token;
+    std::chrono::milliseconds total_time;
+    int tokens_generated;
+};
+
+GenerationResult generateText(cactus::cactus_context& context, const std::string& prompt, int max_tokens = 100) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
     context.params.prompt = prompt;
     context.params.n_predict = max_tokens;
     
     if (!context.initSampling()) {
         std::cerr << "Failed to initialize sampling" << std::endl;
-        return "";
+        return {"", std::chrono::milliseconds(0), std::chrono::milliseconds(0), 0};
     }
     
-    context.rewind();
     context.beginCompletion();
     context.loadPrompt();
+    
+    bool first_token = true;
+    std::chrono::high_resolution_clock::time_point first_token_time;
+    int tokens_generated = 0;
     
     while (context.has_next_token && !context.is_interrupted) {
         auto token_output = context.doCompletion();
         if (token_output.tok == -1) break;
-    }
-    
-    return context.generated_text;
-}
-
-std::string chatWithModel(cactus::cactus_context& context, const std::vector<std::string>& conversation_history, const std::string& user_input) {
-    // Build conversation context
-    std::string messages = "[";
-    for (size_t i = 0; i < conversation_history.size(); i += 2) {
-        if (i < conversation_history.size()) {
-            messages += R"({"role": "user", "content": ")" + conversation_history[i] + R"("})";
-            if (i + 1 < conversation_history.size()) {
-                messages += R"(,{"role": "assistant", "content": ")" + conversation_history[i + 1] + R"("})";
-            }
-            if (i + 2 < conversation_history.size()) messages += ",";
+        
+        if (first_token) {
+            first_token_time = std::chrono::high_resolution_clock::now();
+            first_token = false;
         }
+        tokens_generated++;
     }
     
-    // Add current user input
-    if (!conversation_history.empty()) messages += ",";
-    messages += R"({"role": "user", "content": ")" + user_input + R"("})";
-    messages += "]";
+    auto end_time = std::chrono::high_resolution_clock::now();
     
-    // Format with chat template
-    std::string formatted_prompt;
-    try {
-        formatted_prompt = context.getFormattedChat(messages, "");
-    } catch (const std::exception& e) {
-        std::cerr << "Warning: Chat template formatting failed (" << e.what() << "), using raw prompt" << std::endl;
-        formatted_prompt = user_input;
-    }
+    auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    auto ttft = first_token ? std::chrono::milliseconds(0) : 
+                std::chrono::duration_cast<std::chrono::milliseconds>(first_token_time - start_time);
     
-    return generateText(context, formatted_prompt, 200);
+    return {context.generated_text, ttft, total_time, tokens_generated};
 }
 
 void demonstrateBasicGeneration(cactus::cactus_context& context) {
     std::cout << "\n=== Basic Text Generation Demo ===" << std::endl;
     
+    // Show both approaches for comparison
+    std::cout << "\n--- Traditional Approach ---" << std::endl;
     std::vector<std::string> prompts = {
         "The future of artificial intelligence is",
-        "Write a short story about a robot who discovers emotions:",
-        "Explain quantum computing in simple terms:",
-        "What are the benefits of renewable energy?"
+        "Write a short story about a robot who discovers emotions:"
     };
     
     for (const auto& prompt : prompts) {
         std::cout << "\nPrompt: " << prompt << std::endl;
-        std::cout << "Response: " << generateText(context, prompt, 150) << std::endl;
-        std::cout << std::string(80, '-') << std::endl;
+        std::cout << "Response: " << generateText(context, prompt, 100).text << std::endl;
+        std::cout << std::string(60, '-') << std::endl;
+    }
+    
+    // Clear and show new conversation API
+    context.clearConversation();
+    
+    std::cout << "\n--- New Conversation API ---" << std::endl;
+    std::vector<std::string> messages = {
+        "Hello! How are you?",
+        "What can you help me with?",
+        "Tell me a fun fact about space"
+    };
+    
+    for (const auto& message : messages) {
+        std::cout << "\nUser: " << message << std::endl;
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        auto result = context.continueConversation(message, 150);
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        std::cout << "Bot: " << result.text << std::endl;
+        
+        std::cout << "(TTFT: " << result.time_to_first_token.count() << "ms, "
+                  << "Total: " << result.total_time.count() << "ms, "
+                  << "Tokens: " << result.tokens_generated;
+        
+        if (result.tokens_generated > 0 && result.total_time.count() > 0) {
+            float tokens_per_second = (float)result.tokens_generated * 1000.0f / result.total_time.count();
+            std::cout << ", Speed: " << std::fixed << std::setprecision(1) << tokens_per_second << " tok/s";
+        }
+        
+        if (context.isConversationActive()) {
+            std::cout << ", Conversation Active";
+        }
+        std::cout << ")" << std::endl;
+        std::cout << std::string(60, '-') << std::endl;
     }
 }
 
@@ -83,7 +119,6 @@ void demonstrateChatMode(cactus::cactus_context& context) {
     std::cout << "\n=== Interactive Chat Demo ===" << std::endl;
     std::cout << "Type 'quit' to exit, 'clear' to reset conversation" << std::endl;
     
-    std::vector<std::string> conversation_history;
     std::string input;
     
     while (true) {
@@ -95,7 +130,7 @@ void demonstrateChatMode(cactus::cactus_context& context) {
         }
         
         if (input == "clear") {
-            conversation_history.clear();
+            context.clearConversation();
             std::cout << "Conversation cleared." << std::endl;
             continue;
         }
@@ -103,22 +138,22 @@ void demonstrateChatMode(cactus::cactus_context& context) {
         if (input.empty()) continue;
         
         auto start_time = std::chrono::high_resolution_clock::now();
-        std::string response = chatWithModel(context, conversation_history, input);
+        
+        auto result = context.continueConversation(input, 200);
+        
         auto end_time = std::chrono::high_resolution_clock::now();
+        auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
         
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        std::cout << "Bot: " << result.text << std::endl;
+        std::cout << "(TTFT: " << result.time_to_first_token.count() << "ms, "
+                  << "Total: " << result.total_time.count() << "ms, "
+                  << "Tokens: " << result.tokens_generated;
         
-        std::cout << "Bot: " << response << std::endl;
-        std::cout << "(Generated in " << duration.count() << "ms)" << std::endl;
-        
-        // Update conversation history
-        conversation_history.push_back(input);
-        conversation_history.push_back(response);
-        
-        // Keep conversation history manageable
-        if (conversation_history.size() > 10) {
-            conversation_history.erase(conversation_history.begin(), conversation_history.begin() + 2);
+        if (result.tokens_generated > 0 && result.total_time.count() > 0) {
+            float tokens_per_second = (float)result.tokens_generated * 1000.0f / result.total_time.count();
+            std::cout << ", Speed: " << std::fixed << std::setprecision(1) << tokens_per_second << " tok/s";
         }
+        std::cout << ")" << std::endl;
     }
 }
 
@@ -152,8 +187,8 @@ void demonstrateSamplingVariations(cactus::cactus_context& context) {
         context.params.sampling.top_p = config.top_p;
         context.params.sampling.penalty_repeat = config.repeat_penalty;
         
-        std::string response = generateText(context, prompt, 80);
-        std::cout << "Response: " << response << std::endl;
+        auto result = generateText(context, prompt, 80);
+        std::cout << "Response: " << result.text << std::endl;
         std::cout << std::string(60, '-') << std::endl;
     }
 }
@@ -178,6 +213,10 @@ int main(int argc, char **argv) {
         params.n_batch = 512;
         params.n_gpu_layers = 99; // Use GPU acceleration
         params.cpuparams.n_threads = std::thread::hardware_concurrency();
+        
+        // Cache optimization parameters
+        params.n_cache_reuse = 256; // Enable cache reuse with 256 token chunks
+        params.n_keep = 32;         // Keep first 32 tokens during context shifts
         
         // Default sampling parameters
         params.sampling.temp = 0.7f;
@@ -207,9 +246,14 @@ int main(int argc, char **argv) {
             demonstrateBasicGeneration(context);
         } else {
             std::cout << "\nAvailable demos:" << std::endl;
-            std::cout << "  ./cactus_llm basic    - Basic text generation examples" << std::endl;
-            std::cout << "  ./cactus_llm chat     - Interactive chat mode" << std::endl;
+            std::cout << "  ./cactus_llm basic    - Compare traditional vs new conversation API" << std::endl;
+            std::cout << "  ./cactus_llm chat     - Interactive chat with optimized KV caching" << std::endl;
             std::cout << "  ./cactus_llm sampling - Different sampling strategies" << std::endl;
+            std::cout << "\nNew Conversation API Features:" << std::endl;
+            std::cout << "  - Automatic KV cache optimization" << std::endl;
+            std::cout << "  - Consistent TTFT regardless of conversation length" << std::endl;
+            std::cout << "  - Simple context.continueConversation(message) interface" << std::endl;
+            std::cout << "  - Built-in conversation state management" << std::endl;
             std::cout << "\nRunning basic demo by default...\n" << std::endl;
             
             demonstrateBasicGeneration(context);
