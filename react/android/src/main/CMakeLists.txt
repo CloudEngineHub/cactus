@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(cactus)
 
 set(CMAKE_CXX_STANDARD 17)
-set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../../../cactus)
+set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../../../cpp)
 
 include_directories(${SOURCE_DIR})
 include_directories(${SOURCE_DIR}/ggml-cpu)

@@ -1,4 +1,5 @@
 typedef CactusTokenCallback = bool Function(String token);
+typedef CactusProgressCallback = void Function(double? progress, String statusMessage, bool isError);
 
 class ChatMessage {
   final String role;
@@ -28,6 +29,41 @@ class CactusException implements Exception {
   }
 }
 
+class CactusResult {
+  final String text;
+  final int tokensPredicted;
+  final int tokensEvaluated;
+  final bool truncated;
+  final bool stoppedEos;
+  final bool stoppedWord;
+  final bool stoppedLimit;
+  final String stoppingWord;
+
+  CactusResult({
+    required this.text,
+    required this.tokensPredicted,
+    required this.tokensEvaluated,
+    required this.truncated,
+    required this.stoppedEos,
+    required this.stoppedWord,
+    required this.stoppedLimit,
+    required this.stoppingWord,
+  });
+}
+
+class LoraAdapterInfo {
+  final String path;
+  final double scale;
+
+  LoraAdapterInfo({
+    required this.path,
+    required this.scale,
+  });
+}
+
+// Legacy types for backward compatibility
+typedef CactusCompletionResult = CactusResult;
+
 class CactusInitParams {
   final String? modelPath;
   final String? modelUrl;
@@ -49,7 +85,7 @@ class CactusInitParams {
   final bool useFlashAttention;
   final String? cacheTypeK;
   final String? cacheTypeV;
-  final void Function(double? progress, String statusMessage, bool isError)? onInitProgress;
+  final CactusProgressCallback? onInitProgress;
 
   CactusInitParams({
     this.modelPath,
@@ -203,28 +239,6 @@ class CactusCompletionParams {
   }
 }
 
-class CactusCompletionResult {
-  final String text;
-  final int tokensPredicted;
-  final int tokensEvaluated;
-  final bool truncated;
-  final bool stoppedEos;
-  final bool stoppedWord;
-  final bool stoppedLimit;
-  final String stoppingWord;
-
-  CactusCompletionResult({
-    required this.text,
-    required this.tokensPredicted,
-    required this.tokensEvaluated,
-    required this.truncated,
-    required this.stoppedEos,
-    required this.stoppedWord,
-    required this.stoppedLimit,
-    required this.stoppingWord,
-  });
-}
-
 class BenchResult {
   final String modelDesc;
   final int modelSize;
@@ -242,15 +256,5 @@ class BenchResult {
     required this.ppStd,
     required this.tgAvg,
     required this.tgStd,
-  });
-}
-
-class LoraAdapterInfo {
-  final String path;
-  final double scale;
-
-  LoraAdapterInfo({
-    required this.path,
-    required this.scale,
   });
 } 

@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:cactus/cactus.dart';
 
 class CactusService {
-  CactusContext? _context;
+  CactusVLM? model;
   
   final ValueNotifier<List<ChatMessage>> messages = ValueNotifier([]);
   final ValueNotifier<bool> isLoading = ValueNotifier(true);
@@ -16,14 +16,14 @@ class CactusService {
 
   Future<void> initialize() async {
     try {
-      _context = await CactusContext.init(CactusInitParams(
+      model = await CactusVLM.init(
         modelUrl: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
-        mmprojUrl: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf',
-        onInitProgress: (progress, statusText, isError) {
+        visionUrl: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf',
+        onProgress: (progress, statusText, isError) {
           status.value = statusText;
           if (isError) error.value = statusText;
         },
-      ));
+      );
       
       status.value = 'Ready!';
       isLoading.value = false;
@@ -34,32 +34,40 @@ class CactusService {
   }
 
   Future<void> sendMessage(String text) async {
-    if (_context == null) return;
+    if (model == null) return;
     
     isLoading.value = true;
     
-    // Add user message
     final userMsg = ChatMessage(role: 'user', content: text);
     messages.value = [...messages.value, userMsg, ChatMessage(role: 'assistant', content: '')];
     
+    final stopwatch = Stopwatch()..start();
+    int? ttft;
+    String response = '';
+    
     try {
-      String response = '';
-      
-      final result = await _context!.completion(
-        CactusCompletionParams(
-          messages: messages.value.where((m) => m.content.isNotEmpty).toList(),
-          maxPredictedTokens: 200,
-          onNewToken: (token) {
-            response += token;
-            _updateLastMessage(response);
-            return true;
-          },
-        ),
-        mediaPaths: _stagedImagePath != null ? [_stagedImagePath!] : [],
+      final result = await model!.completion(
+        messages.value.where((m) => m.content.isNotEmpty).toList(),
+        imagePaths: _stagedImagePath != null ? [_stagedImagePath!] : [],
+        maxTokens: 200,
+        onToken: (token) {
+          if (token == '<|im_end|>' || token == '</s>') return false;
+          ttft ??= stopwatch.elapsedMilliseconds;
+          response += token;
+          _updateLastMessage(response);
+          return true;
+        },
       );
       
+      stopwatch.stop();
+      final totalMs = stopwatch.elapsedMilliseconds;
+      final tokens = result.tokensPredicted;
+      final tps = tokens > 0 && totalMs > 0 ? tokens * 1000 / totalMs : 0;
+      
+      debugPrint('[PERF] TTFT: ${ttft ?? 'N/A'}ms | Total: ${totalMs}ms | Tokens: $tokens | Speed: ${tps.toStringAsFixed(1)} tok/s');
+      
       _updateLastMessage(result.text.isNotEmpty ? result.text : response);
-      _stagedImagePath = null; // Clear after use
+      _stagedImagePath = null;
       
     } on CactusException catch (e) {
       _updateLastMessage('Error: ${e.message}');
@@ -86,11 +94,11 @@ class CactusService {
 
   void clearConversation() {
     messages.value = [];
-    _context?.rewind();
+    model?.rewind();
   }
 
   void dispose() {
-    _context?.release();
+    model?.dispose();
     messages.dispose();
     isLoading.dispose();
     status.dispose();

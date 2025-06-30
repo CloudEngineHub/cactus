@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../cactus_service.dart';
 import 'package:cactus/cactus.dart';
-import 'widgets/message_bubble.dart';
+import 'message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
   final CactusService cactusService;
@@ -151,7 +151,7 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.all(8),
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(

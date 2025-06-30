@@ -1,19 +1,15 @@
-library cactus;
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import './ffi_bindings.dart' as bindings;
 import './types.dart';
 import './tools.dart';
-
-export './types.dart';
-export './tools.dart';
 
 
 
@@ -26,7 +22,7 @@ bool _staticTokenCallbackDispatcher(Pointer<Utf8> tokenC) {
       final token = tokenC.toDartString();
       return _currentOnNewTokenCallback!(token);
     } catch (e) {
-      print('Error in token callback: $e');
+      debugPrint('Error in token callback: $e');
       return false;
     }
   }
@@ -644,7 +640,7 @@ class CactusContext {
     // For conversation continuation, we only need the user part + assistant start
     final idx = formatted.indexOf('<|im_start|>assistant');
     if (idx != -1) {
-      return formatted.substring(0, idx) + '<|im_start|>assistant\n';
+      return '${formatted.substring(0, idx)}<|im_start|>assistant\n';
     }
     return formatted;
   }
