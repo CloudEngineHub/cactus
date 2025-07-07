@@ -1,9 +1,8 @@
 import 'dart:async';
 
 import './types.dart';
-import './tools.dart';
-import './cactus_context.dart';
-import './cactus_telemetry.dart';
+import './context.dart';
+import './telemetary.dart';
 
 class CactusVLM {
   CactusContext? _context;
@@ -47,7 +46,7 @@ class CactusVLM {
     return vlm;
   }
 
-  Future<CactusResult> completion(
+  Future<CactusCompletionResult> completion(
     List<ChatMessage> messages, {
     List<String> imagePaths = const [],
     int maxTokens = 256,
@@ -56,7 +55,6 @@ class CactusVLM {
     double? topP,
     List<String>? stopSequences,
     CactusTokenCallback? onToken,
-    Tools? tools,
   }) async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
     
@@ -64,7 +62,6 @@ class CactusVLM {
     bool firstTokenReceived = false;
     DateTime? firstTokenTime;
     
-    // Wrap the callback to capture first token timing
     CactusTokenCallback? wrappedCallback;
     if (onToken != null) {
       wrappedCallback = (String token) {
@@ -87,7 +84,6 @@ class CactusVLM {
         onNewToken: wrappedCallback,
       ),
       mediaPaths: imagePaths,
-      tools: tools,
     );
     
     // Track telemetry after completion
@@ -109,54 +105,54 @@ class CactusVLM {
     return result;
   }
 
-  bool get supportsVision {
+  Future<bool> get supportsVision async {
     if (_context == null) return false;
-    return _context!.supportsVision();
+    return await _context!.supportsVision();
   }
 
-  bool get supportsAudio {
+  Future<bool> get supportsAudio async {
     if (_context == null) return false;
-    return _context!.supportsAudio();
+    return await _context!.supportsAudio();
   }
 
-  bool get isMultimodalEnabled {
+  Future<bool> get isMultimodalEnabled async {
     if (_context == null) return false;
-    return _context!.isMultimodalEnabled();
+    return await _context!.isMultimodalEnabled();
   }
 
-  List<int> tokenize(String text) {
+  Future<List<int>> tokenize(String text) async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    return _context!.tokenize(text);
+    return await _context!.tokenize(text);
   }
 
-  String detokenize(List<int> tokens) {
+  Future<String> detokenize(List<int> tokens) async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    return _context!.detokenize(tokens);
+    return await _context!.detokenize(tokens);
   }
 
-  void applyLoraAdapters(List<LoraAdapterInfo> adapters) {
+  Future<void> applyLoraAdapters(List<LoraAdapterInfo> adapters) async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    _context!.applyLoraAdapters(adapters);
+    await _context!.applyLoraAdapters(adapters);
   }
 
-  void removeLoraAdapters() {
+  Future<void> removeLoraAdapters() async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    _context!.removeLoraAdapters();
+    await _context!.removeLoraAdapters();
   }
 
-  List<LoraAdapterInfo> getLoadedLoraAdapters() {
+  Future<List<LoraAdapterInfo>> getLoadedLoraAdapters() async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    return _context!.getLoadedLoraAdapters();
+    return await _context!.getLoadedLoraAdapters();
   }
 
-  void rewind() {
+  Future<void> rewind() async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    _context!.rewind();
+    await _context!.rewind();
   }
 
-  void stopCompletion() {
+  Future<void> stopCompletion() async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    _context!.stopCompletion();
+    await _context!.stopCompletion();
   }
 
   void dispose() {

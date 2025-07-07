@@ -1,9 +1,8 @@
 import 'dart:async';
 
 import './types.dart';
-import './tools.dart';
-import './cactus_context.dart';
-import './cactus_telemetry.dart';
+import './context.dart';
+import './telemetary.dart';
 
 class CactusLM {
   CactusContext? _context;
@@ -45,7 +44,7 @@ class CactusLM {
     return lm;
   }
 
-  Future<CactusResult> completion(
+  Future<CactusCompletionResult> completion(
     List<ChatMessage> messages, {
     int maxTokens = 256,
     double? temperature,
@@ -53,7 +52,6 @@ class CactusLM {
     double? topP,
     List<String>? stopSequences,
     CactusTokenCallback? onToken,
-    Tools? tools,
   }) async {
     if (_context == null) throw CactusException('CactusLM not initialized');
     
@@ -83,7 +81,6 @@ class CactusLM {
         stopSequences: stopSequences,
         onNewToken: wrappedCallback,
       ),
-      tools: tools,
     );
     
     // Track telemetry after completion
@@ -104,44 +101,44 @@ class CactusLM {
     return result;
   }
 
-  List<double> embedding(String text) {
+  Future<List<double>> embedding(String text) async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    return _context!.embedding(text);
+    return await _context!.embedding(text);
   }
 
-  List<int> tokenize(String text) {
+  Future<List<int>> tokenize(String text) async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    return _context!.tokenize(text);
+    return await _context!.tokenize(text);
   }
 
-  String detokenize(List<int> tokens) {
+  Future<String> detokenize(List<int> tokens) async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    return _context!.detokenize(tokens);
+    return await _context!.detokenize(tokens);
   }
 
-  void applyLoraAdapters(List<LoraAdapterInfo> adapters) {
+  Future<void> applyLoraAdapters(List<LoraAdapterInfo> adapters) async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    _context!.applyLoraAdapters(adapters);
+    await _context!.applyLoraAdapters(adapters);
   }
 
-  void removeLoraAdapters() {
+  Future<void> removeLoraAdapters() async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    _context!.removeLoraAdapters();
+    await _context!.removeLoraAdapters();
   }
 
-  List<LoraAdapterInfo> getLoadedLoraAdapters() {
+  Future<List<LoraAdapterInfo>> getLoadedLoraAdapters() async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    return _context!.getLoadedLoraAdapters();
+    return await _context!.getLoadedLoraAdapters();
   }
 
-  void rewind() {
+  Future<void> rewind() async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    _context!.rewind();
+    await _context!.rewind();
   }
 
-  void stopCompletion() {
+  Future<void> stopCompletion() async {
     if (_context == null) throw CactusException('CactusLM not initialized');
-    _context!.stopCompletion();
+    await _context!.stopCompletion();
   }
 
   void dispose() {

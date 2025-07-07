@@ -140,15 +140,12 @@ class CactusCompletionParams {
   final int? nProbs;
   final List<String>? stopSequences;
   final String? grammar;
-  final CactusTokenCallback? onNewToken;
   final String? chatTemplate;
+  final CactusTokenCallback? onNewToken;
   final ResponseFormat? responseFormat;
   final bool? jinja;
-  final String? tools;
-  final String? toolChoice;
-  final bool? parallelToolCalls;
 
-  CactusCompletionParams({
+  const CactusCompletionParams({
     required this.messages,
     this.maxPredictedTokens = 256,
     this.threads,
@@ -169,13 +166,10 @@ class CactusCompletionParams {
     this.nProbs,
     this.stopSequences,
     this.grammar,
-    this.onNewToken,
     this.chatTemplate,
+    this.onNewToken,
     this.responseFormat,
     this.jinja,
-    this.tools,
-    this.toolChoice,
-    this.parallelToolCalls,
   });
 
   CactusCompletionParams copyWith({
@@ -199,13 +193,10 @@ class CactusCompletionParams {
     int? nProbs,
     List<String>? stopSequences,
     String? grammar,
-    CactusTokenCallback? onNewToken,
     String? chatTemplate,
+    CactusTokenCallback? onNewToken,
     ResponseFormat? responseFormat,
     bool? jinja,
-    String? tools,
-    String? toolChoice,
-    bool? parallelToolCalls,
   }) {
     return CactusCompletionParams(
       messages: messages ?? this.messages,
@@ -228,13 +219,10 @@ class CactusCompletionParams {
       nProbs: nProbs ?? this.nProbs,
       stopSequences: stopSequences ?? this.stopSequences,
       grammar: grammar ?? this.grammar,
-      onNewToken: onNewToken ?? this.onNewToken,
       chatTemplate: chatTemplate ?? this.chatTemplate,
+      onNewToken: onNewToken ?? this.onNewToken,
       responseFormat: responseFormat ?? this.responseFormat,
       jinja: jinja ?? this.jinja,
-      tools: tools ?? this.tools,
-      toolChoice: toolChoice ?? this.toolChoice,
-      parallelToolCalls: parallelToolCalls ?? this.parallelToolCalls,
     );
   }
 }

@@ -1,14 +1,11 @@
 library cactus;
 
-// Core types and functionality
+export './vlm.dart';
+export './lm.dart';
+export './tts.dart';
 export './types.dart';
-export './tools.dart';
+export './context.dart';
+export './telemetary.dart';
+export './bindings.dart';
 
-// New simple APIs
-export './cactus_lm.dart';
-export './cactus_vlm.dart';
-export './cactus_tts.dart';
-export './cactus_telemetry.dart';
-
-// Legacy API for backward compatibility
-export './cactus_context.dart' show CactusContext;
+export './context.dart' show CactusContext;
