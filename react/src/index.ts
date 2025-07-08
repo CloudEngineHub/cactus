@@ -50,6 +50,7 @@ export type {
 }
 
 export { SchemaGrammarConverter, convertJsonSchemaToGrammar, Tools }
+export * from './remote'
 
 const EVENT_ON_INIT_CONTEXT_PROGRESS = '@Cactus_onInitContextProgress'
 const EVENT_ON_TOKEN = '@Cactus_onToken'

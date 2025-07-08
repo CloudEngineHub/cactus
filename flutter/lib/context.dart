@@ -300,7 +300,7 @@ class _CactusIsolateWorker {
       }
 
       _currentOnNewTokenCallback = params.onNewToken != null 
-          ? (token) { replyPort.send(token); return params.onNewToken!(token); }
+          ? (token) { replyPort.send(token); return true; }
           : null;
 
       cCompParams.ref

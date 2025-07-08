@@ -19,6 +19,7 @@ class CactusService {
       model = await CactusVLM.init(
         modelUrl: 'https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf',
         visionUrl: 'https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf',
+        // cactusToken: 'contact founders@cactuscompute.com for enterprise token',
         onProgress: (progress, statusText, isError) {
           status.value = statusText;
           if (isError) error.value = statusText;
@@ -50,6 +51,7 @@ class CactusService {
         messages.value.where((m) => m.content.isNotEmpty).toList(),
         imagePaths: _stagedImagePath != null ? [_stagedImagePath!] : [],
         maxTokens: 200,
+        // mode: "localfirst", // enterprise feature: try local, fall back to cloud if local inference fails and vice versa
         onToken: (token) {
           if (token == '<|im_end|>' || token == '</s>') return false;
           ttft ??= stopwatch.elapsedMilliseconds;

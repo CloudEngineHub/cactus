@@ -3,6 +3,7 @@ import 'dart:async';
 import './types.dart';
 import './context.dart';
 import './telemetary.dart';
+import './remote.dart';
 
 class CactusVLM {
   CactusContext? _context;
@@ -20,8 +21,13 @@ class CactusVLM {
     int gpuLayers = 0,
     int threads = 4,
     CactusProgressCallback? onProgress,
+    String? cactusToken,
   }) async {
     final vlm = CactusVLM._();
+    
+    if (cactusToken != null) {
+      setCactusToken(cactusToken);
+    }
     
     final initParams = CactusInitParams(
       modelUrl: modelUrl,
@@ -55,9 +61,8 @@ class CactusVLM {
     double? topP,
     List<String>? stopSequences,
     CactusTokenCallback? onToken,
+    String mode = "local",
   }) async {
-    if (_context == null) throw CactusException('CactusVLM not initialized');
-    
     final startTime = DateTime.now();
     bool firstTokenReceived = false;
     DateTime? firstTokenTime;
@@ -72,21 +77,40 @@ class CactusVLM {
         return onToken(token);
       };
     }
+
+    CactusCompletionResult? result;
+    Exception? lastError;
+
+    if (mode == "remote") {
+      result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+    } else if (mode == "local") {
+      result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+    } else if (mode == "localfirst") {
+      try {
+        result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+      } catch (e) {
+        lastError = e is Exception ? e : Exception(e.toString());
+        try {
+          result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+        } catch (remoteError) {
+          throw lastError;
+        }
+      }
+    } else if (mode == "remotefirst") {
+      try {
+        result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+      } catch (e) {
+        lastError = e is Exception ? e : Exception(e.toString());
+        try {
+          result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+        } catch (localError) {
+          throw lastError;
+        }
+      }
+    } else {
+      throw ArgumentError('Invalid mode: $mode. Must be "local", "remote", "localfirst", or "remotefirst"');
+    }
     
-    final result = await _context!.completion(
-      CactusCompletionParams(
-        messages: messages,
-        maxPredictedTokens: maxTokens,
-        temperature: temperature,
-        topK: topK,
-        topP: topP,
-        stopSequences: stopSequences,
-        onNewToken: wrappedCallback,
-      ),
-      mediaPaths: imagePaths,
-    );
-    
-    // Track telemetry after completion
     if (_initParams != null) {
       final endTime = DateTime.now();
       final totalTime = endTime.difference(startTime).inMilliseconds;
@@ -99,10 +123,75 @@ class CactusVLM {
         'toks_generated': result.tokensPredicted,
         'ttft': ttft,
         'num_images': imagePaths.length,
+        'mode': mode,
       }, _initParams!);
     }
     
     return result;
+  }
+
+  Future<CactusCompletionResult> _handleLocalCompletion(
+    List<ChatMessage> messages,
+    List<String> imagePaths,
+    int maxTokens,
+    double? temperature,
+    int? topK,
+    double? topP,
+    List<String>? stopSequences,
+    CactusTokenCallback? onToken,
+  ) async {
+    if (_context == null) throw CactusException('CactusVLM not initialized');
+    
+    return await _context!.completion(
+      CactusCompletionParams(
+        messages: messages,
+        maxPredictedTokens: maxTokens,
+        temperature: temperature,
+        topK: topK,
+        topP: topP,
+        stopSequences: stopSequences,
+        onNewToken: onToken,
+      ),
+      mediaPaths: imagePaths,
+    );
+  }
+
+  Future<CactusCompletionResult> _handleRemoteCompletion(
+    List<ChatMessage> messages,
+    List<String> imagePaths,
+    int maxTokens,
+    double? temperature,
+    int? topK,
+    double? topP,
+    List<String>? stopSequences,
+    CactusTokenCallback? onToken,
+  ) async {
+    final prompt = messages.map((m) => '${m.role}: ${m.content}').join('\n');
+    final String imagePath = imagePaths.isNotEmpty ? imagePaths.first : '';
+    
+    String responseText;
+    if (imagePath.isNotEmpty) {
+      responseText = await getVisionCompletion(prompt, imagePath);
+    } else {
+      responseText = await getTextCompletion(prompt);
+    }
+    
+    if (onToken != null) {
+      for (int i = 0; i < responseText.length; i++) {
+        if (!onToken(responseText[i])) break;
+      }
+    }
+    
+    return CactusCompletionResult(
+      text: responseText,
+      tokensPredicted: responseText.split(' ').length,
+      tokensEvaluated: prompt.split(' ').length,
+      truncated: false,
+      stoppedEos: true,
+      stoppedWord: false,
+      stoppedLimit: false,
+      stoppingWord: '',
+    );
   }
 
   Future<bool> get supportsVision async {

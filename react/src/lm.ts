@@ -8,6 +8,7 @@ import type {
   NativeEmbeddingResult,
 } from './index'
 import { Telemetry } from './telemetry'
+import { setCactusToken, getVertexAIEmbedding } from './remote'
 
 interface CactusLMReturn {
   lm: CactusLM | null
@@ -26,7 +27,12 @@ export class CactusLM {
   static async init(
     params: ContextParams,
     onProgress?: (progress: number) => void,
+    cactusToken?: string,
   ): Promise<CactusLMReturn> {
+    if (cactusToken) {
+      setCactusToken(cactusToken);
+    }
+
     const configs = [
       params,
       { ...params, n_gpu_layers: 0 } 
@@ -74,8 +80,58 @@ export class CactusLM {
   async embedding(
     text: string,
     params?: EmbeddingParams,
+    mode: string = 'local',
   ): Promise<NativeEmbeddingResult> {
-    return this.context.embedding(text, params)
+    let result: NativeEmbeddingResult;
+    let lastError: Error | null = null;
+
+    if (mode === 'remote') {
+      result = await this._handleRemoteEmbedding(text);
+    } else if (mode === 'local') {
+      result = await this._handleLocalEmbedding(text, params);
+    } else if (mode === 'localfirst') {
+      try {
+        result = await this._handleLocalEmbedding(text, params);
+      } catch (e) {
+        lastError = e as Error;
+        try {
+          result = await this._handleRemoteEmbedding(text);
+        } catch (remoteError) {
+          throw lastError;
+        }
+      }
+    } else if (mode === 'remotefirst') {
+      try {
+        result = await this._handleRemoteEmbedding(text);
+      } catch (e) {
+        lastError = e as Error;
+        try {
+          result = await this._handleLocalEmbedding(text, params);
+        } catch (localError) {
+          throw lastError;
+        }
+      }
+    } else {
+      throw new Error('Invalid mode: ' + mode + '. Must be "local", "remote", "localfirst", or "remotefirst"');
+    }
+
+    Telemetry.track({
+      event: 'embedding',
+      mode: mode,
+    }, this.initParams);
+
+    return result;
+  }
+
+  private async _handleLocalEmbedding(text: string, params?: EmbeddingParams): Promise<NativeEmbeddingResult> {
+    return this.context.embedding(text, params);
+  }
+
+  private async _handleRemoteEmbedding(text: string): Promise<NativeEmbeddingResult> {
+    const embeddingValues = await getVertexAIEmbedding(text);
+    return {
+      embedding: embeddingValues,
+    };
   }
 
   async rewind(): Promise<void> {
