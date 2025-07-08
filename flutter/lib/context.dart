@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import './bindings.dart' as bindings;
 import './types.dart';
+import './telemetry.dart';
 
 CactusTokenCallback? _currentOnNewTokenCallback;
 
@@ -26,12 +27,14 @@ bool _staticTokenCallbackDispatcher(Pointer<Utf8> tokenC) {
 class CactusContext {
   SendPort? _isolateSendPort;
   bool _disposed = false;
+  late final CactusInitParams initParams;
 
   CactusContext._();
 
   static Future<CactusContext> init(CactusInitParams params) async {
     debugPrint('Starting CactusContext.init...');
     final context = CactusContext._();
+    context.initParams = params;
     final resolvedParams = await _resolveParams(params);
     
     debugPrint('Spawning isolate...');
@@ -90,9 +93,13 @@ class CactusContext {
     _checkDisposed();
     final replyPort = ReceivePort();
     final completer = Completer<CactusCompletionResult>();
+
+    final startTime = DateTime.now();
+    DateTime? firstTokenTime;
     
     replyPort.listen((message) {
       if (message is String && params.onNewToken != null) {
+        firstTokenTime ??= DateTime.now();
         params.onNewToken!(message);
       } else if (message is Map) {
         message['error'] != null ? completer.completeError(message['error']) : completer.complete(message['result']);
@@ -101,7 +108,24 @@ class CactusContext {
     });
     
     _isolateSendPort!.send(['completion', _SendableCompletionParams.fromOriginal(params), mediaPaths, replyPort.sendPort]);
-    return completer.future;
+    try{
+      final result = await completer.future;
+      final endTime = DateTime.now();
+      final totalTime = endTime.difference(startTime).inMilliseconds;
+      final tokPerSec = totalTime > 0 ? (result.tokensPredicted * 1000.0) / totalTime : null;
+      final ttft = firstTokenTime?.difference(startTime).inMilliseconds;
+      CactusTelemetry.track({
+        'event': 'completion',
+        'tok_per_sec': tokPerSec,
+        'toks_generated': result.tokensPredicted,
+        'ttft': ttft,
+        'num_images': mediaPaths.length,
+      }, initParams);
+      return result;
+    } catch (e) {
+      CactusTelemetry.error(e, initParams);
+      rethrow;
+    }
   }
 
   Future<List<int>> tokenize(String text) => _sendCommand(['tokenize', text]);

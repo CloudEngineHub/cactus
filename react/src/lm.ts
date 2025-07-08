@@ -17,11 +17,9 @@ interface CactusLMReturn {
 
 export class CactusLM {
   private context: LlamaContext
-  private initParams: ContextParams
 
-  private constructor(context: LlamaContext, initParams: ContextParams) {
+  private constructor(context: LlamaContext) {
     this.context = context
-    this.initParams = initParams
   }
 
   static async init(
@@ -41,9 +39,13 @@ export class CactusLM {
     for (const config of configs) {
       try {
         const context = await initLlama(config, onProgress);
-        return { lm: new CactusLM(context, config), error: null };
+        return { lm: new CactusLM(context), error: null };
       } catch (e) {
-        Telemetry.error(e as Error, config);
+        Telemetry.error(e as Error, {
+          n_gpu_layers: config.n_gpu_layers ?? null,
+          n_ctx: config.n_ctx ?? null,
+          model: config.model ?? null,
+        });
         if (configs.indexOf(config) === configs.length - 1) {
           return { lm: null, error: e as Error };
         }
@@ -57,24 +59,7 @@ export class CactusLM {
     params: CompletionParams = {},
     callback?: (data: any) => void,
   ): Promise<NativeCompletionResult> {
-    const startTime = Date.now();
-    let firstTokenTime: number | null = null;
-    
-    const wrappedCallback = callback ? (data: any) => {
-      if (firstTokenTime === null) firstTokenTime = Date.now();
-      callback(data);
-    } : undefined;
-
-    const result = await this.context.completion({ messages, ...params }, wrappedCallback);
-    
-    Telemetry.track({
-      event: 'completion',
-      tok_per_sec: (result as any).timings?.predicted_per_second,
-      toks_generated: (result as any).timings?.predicted_n,
-      ttft: firstTokenTime ? firstTokenTime - startTime : null,
-    }, this.initParams);
-
-    return result;
+    return await this.context.completion({ messages, ...params }, callback);
   }
 
   async embedding(
@@ -114,12 +99,6 @@ export class CactusLM {
     } else {
       throw new Error('Invalid mode: ' + mode + '. Must be "local", "remote", "localfirst", or "remotefirst"');
     }
-
-    Telemetry.track({
-      event: 'embedding',
-      mode: mode,
-    }, this.initParams);
-
     return result;
   }
 

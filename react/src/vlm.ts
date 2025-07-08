@@ -29,11 +29,9 @@ export type VLMCompletionParams = Omit<CompletionParams, 'prompt'> & {
 
 export class CactusVLM {
   private context: LlamaContext
-  private initParams: VLMContextParams
-
-  private constructor(context: LlamaContext, initParams: VLMContextParams) {
+  
+  private constructor(context: LlamaContext) {
     this.context = context
-    this.initParams = initParams
   }
 
   static async init(
@@ -54,9 +52,13 @@ export class CactusVLM {
       try {
         const context = await initLlama(config, onProgress)
         await initMultimodal(context.id, params.mmproj, false)
-        return {vlm: new CactusVLM(context, params), error: null}
+        return {vlm: new CactusVLM(context), error: null}
       } catch (e) {
-        Telemetry.error(e as Error, config);
+        Telemetry.error(e as Error, {
+          n_gpu_layers: config.n_gpu_layers ?? null,
+          n_ctx: config.n_ctx ?? null,
+          model: config.model ?? null,
+        });
         if (configs.indexOf(config) === configs.length - 1) {
           return {vlm: null, error: e as Error}
         }
@@ -72,39 +74,32 @@ export class CactusVLM {
     callback?: (data: any) => void,
   ): Promise<NativeCompletionResult> {
     const mode = params.mode || 'local';
-    const startTime = Date.now();
-    let firstTokenTime: number | null = null;
-    
-    const wrappedCallback = callback ? (data: any) => {
-      if (firstTokenTime === null) firstTokenTime = Date.now();
-      callback(data);
-    } : undefined;
 
     let result: NativeCompletionResult;
     let lastError: Error | null = null;
 
     if (mode === 'remote') {
-      result = await this._handleRemoteCompletion(messages, params, wrappedCallback);
+      result = await this._handleRemoteCompletion(messages, params, callback);
     } else if (mode === 'local') {
-      result = await this._handleLocalCompletion(messages, params, wrappedCallback);
+      result = await this._handleLocalCompletion(messages, params, callback);
     } else if (mode === 'localfirst') {
       try {
-        result = await this._handleLocalCompletion(messages, params, wrappedCallback);
+        result = await this._handleLocalCompletion(messages, params, callback);
       } catch (e) {
         lastError = e as Error;
         try {
-          result = await this._handleRemoteCompletion(messages, params, wrappedCallback);
+          result = await this._handleRemoteCompletion(messages, params, callback);
         } catch (remoteError) {
           throw lastError;
         }
       }
     } else if (mode === 'remotefirst') {
       try {
-        result = await this._handleRemoteCompletion(messages, params, wrappedCallback);
+        result = await this._handleRemoteCompletion(messages, params, callback);
       } catch (e) {
         lastError = e as Error;
         try {
-          result = await this._handleLocalCompletion(messages, params, wrappedCallback);
+          result = await this._handleLocalCompletion(messages, params, callback);
         } catch (localError) {
           throw lastError;
         }
@@ -112,15 +107,6 @@ export class CactusVLM {
     } else {
       throw new Error('Invalid mode: ' + mode + '. Must be "local", "remote", "localfirst", or "remotefirst"');
     }
-    
-    Telemetry.track({
-      event: 'completion',
-      tok_per_sec: (result as any).timings?.predicted_per_second,
-      toks_generated: (result as any).timings?.predicted_n,
-      ttft: firstTokenTime ? firstTokenTime - startTime : null,
-      num_images: params.images?.length,
-      mode: mode,
-    }, this.initParams);
 
     return result;
   }

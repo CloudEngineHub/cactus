@@ -18,6 +18,7 @@ import type {
   NativeAudioCompletionResult,
   NativeAudioTokensResult,
   NativeAudioDecodeResult,
+  NativeDeviceInfo,
 } from './NativeCactus'
 import type {
   SchemaGrammarConverterPropOrder,
@@ -27,6 +28,7 @@ import { SchemaGrammarConverter, convertJsonSchemaToGrammar } from './grammar'
 import type { CactusMessagePart, CactusOAICompatibleMessage } from './chat'
 import { formatChat } from './chat'
 import { Tools, parseAndExecuteTool } from './tools'
+import { Telemetry, type TelemetryParams } from './telemetry'
 export type {
   NativeContextParams,
   NativeLlamaContext,
@@ -160,6 +162,12 @@ const getJsonSchema = (responseFormat?: CompletionResponseFormat) => {
     return responseFormat.schema || {}
   }
   return null
+}
+
+const telemetryParams: TelemetryParams = {
+  n_gpu_layers: null,
+  n_ctx: null,
+  model: null
 }
 
 export class LlamaContext {
@@ -348,12 +356,21 @@ export class LlamaContext {
       if (jsonSchema) nativeParams.json_schema = JSON.stringify(jsonSchema)
     }
 
+    const startTime = Date.now();
+    let firstTokenTime: number | null = null;
+    const deviceInfo = await getDeviceInfo(this.id);
+
+    const wrappedCallback = callback ? (data: any) => {
+      if (firstTokenTime === null) firstTokenTime = Date.now();
+      callback(data);
+    } : undefined;
+
     let tokenListener: any =
-      callback &&
+      wrappedCallback &&
       EventEmitter.addListener(EVENT_ON_TOKEN, (evt: TokenNativeEvent) => {
         const { contextId, tokenResult } = evt
         if (contextId !== this.id) return
-        callback(tokenResult)
+        wrappedCallback(tokenResult)
       })
 
     if (!nativeParams.prompt) throw new Error('Prompt is required')
@@ -361,6 +378,12 @@ export class LlamaContext {
     const promise = Cactus.completion(this.id, nativeParams)
     return promise
       .then((completionResult) => {
+        Telemetry.track({
+          event: 'completion',
+          tok_per_sec: (completionResult as any).timings?.predicted_per_second,
+          toks_generated: (completionResult as any).timings?.predicted_n,
+          ttft: firstTokenTime ? firstTokenTime - startTime : null,
+        }, telemetryParams, deviceInfo);
         tokenListener?.remove()
         tokenListener = null
         return completionResult
@@ -384,11 +407,21 @@ export class LlamaContext {
     return Cactus.detokenize(this.id, tokens)
   }
 
-  embedding(
+  async embedding(
     text: string,
     params?: EmbeddingParams,
   ): Promise<NativeEmbeddingResult> {
-    return Cactus.embedding(this.id, text, params || {})
+    const startTime = Date.now();
+    const embeddingResult = await Cactus.embedding(this.id, text, params || {})
+    const totalTime = Date.now() - startTime;
+    const deviceInfo = await getDeviceInfo(this.id);
+    Telemetry.track({
+      event: 'embedding',
+      mode: 'local',
+      embedding_time: totalTime,
+    }, telemetryParams, deviceInfo);
+    return embeddingResult;
+    
   }
 
   async bench(
@@ -512,6 +545,10 @@ export async function initLlama(
       scaled: l.scaled,
     }))
 
+  telemetryParams.n_gpu_layers = rest.n_gpu_layers || null;
+  telemetryParams.n_ctx = rest.n_ctx || null;
+  telemetryParams.model = model;
+
   const contextId = contextIdCounter + contextIdRandom()
   contextIdCounter += 1
 
@@ -583,7 +620,18 @@ export const releaseMultimodal = async (contextId: number) => {
 };
 
 export const multimodalCompletion = async (contextId: number, prompt: string, mediaPaths: string[], params: NativeCompletionParams): Promise<NativeCompletionResult> => {
-  return await Cactus.multimodalCompletion(contextId, prompt, mediaPaths, params);
+  const result = await Cactus.multimodalCompletion(contextId, prompt, mediaPaths, params);
+
+  const deviceInfo = await getDeviceInfo(contextId);
+
+  Telemetry.track({
+    event: 'completion',
+    tok_per_sec: (result as any).timings?.predicted_per_second,
+    toks_generated: (result as any).timings?.predicted_n,
+    num_images: mediaPaths?.length,
+  }, telemetryParams, deviceInfo);
+
+  return result;
 };
 
 export const initVocoder = async (contextId: number, vocoderModelPath: string) => {
@@ -620,6 +668,10 @@ export const tokenize = async (contextId: number, text: string, mediaPaths?: str
   } else {
     return await Cactus.tokenize(contextId, text);
   }
+};
+
+export const getDeviceInfo = async (contextId: number): Promise<NativeDeviceInfo> => {
+  return await Cactus.getDeviceInfo(contextId);
 };
 
 export { CactusLM } from './lm';

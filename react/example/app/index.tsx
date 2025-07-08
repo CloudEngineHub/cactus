@@ -11,14 +11,12 @@ export default function HomeScreen() {
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initProgress, setInitProgress] = useState(0);
-  const [currentFile, setCurrentFile] = useState('');
 
   useEffect(() => {
     const initializeCactus = async () => {
       try {
-        await cactus.initialize((progress, file) => {
+        await cactus.initialize((progress) => {
           setInitProgress(progress);
-          setCurrentFile(file);
         });
         setIsInitialized(true);
       } catch (error) {
@@ -61,8 +59,8 @@ export default function HomeScreen() {
     }
   };
 
-  const handleAttachImage = () => {
-    const demoImageUri = cactus.getDemoImageUri();
+  const handleAttachImage = async () => {
+    const demoImageUri = await cactus.downloadDemoImage();
     if (demoImageUri.startsWith('file://') || demoImageUri.startsWith('/')) {
       setAttachedImages(prev => [...prev, demoImageUri]);
     } else {
@@ -97,7 +95,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <Header />
-        <LoadingScreen progress={initProgress} currentFile={currentFile} />
+        <LoadingScreen progress={initProgress} />
       </SafeAreaView>
     );
   }

@@ -9,6 +9,7 @@ export type Message = CactusOAICompatibleMessage & {
 const modelUrl = 'https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf';
 const mmprojUrl = 'https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf';
 const stopWords = ['<|end_of_text|>', '<|endoftext|>', '</s>', '<end_of_utterance>'];
+const demoImageUrl = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop';
 
 class CactusManager {
   private vlm: CactusVLM | null = null;
@@ -41,12 +42,34 @@ class CactusManager {
     }
   }
 
-  async initialize(onProgress: (progress: number, file: string) => void): Promise<void> {
+  async downloadDemoImage(): Promise<string> {
+    const documentsPath = RNFS.DocumentDirectoryPath;
+    const targetPath = `${documentsPath}/demo_image.jpg`;
+    
+    if (await RNFS.exists(targetPath)) {
+      return targetPath;
+    }
+    
+    const { promise } = RNFS.downloadFile({
+      fromUrl: demoImageUrl,
+      toFile: targetPath,
+    });
+
+    const result = await promise;
+
+    if (result.statusCode === 200) {
+      return targetPath;
+    } else {
+      throw new Error(`Failed to download demo image. Status code: ${result.statusCode}`);
+    }
+  }
+
+  async initialize(onProgress: (progress: number) => void): Promise<void> {
     if (this.isInitialized) return;
 
     const [modelPath, mmprojPath] = await Promise.all([
-      this.downloadFile(modelUrl, 'model.gguf', onProgress),
-      this.downloadFile(mmprojUrl, 'mmproj.gguf', onProgress),
+      this.downloadFile(modelUrl, 'SmolVLM2-500M-Video-Instruct-Q8_0.gguf', onProgress),
+      this.downloadFile(mmprojUrl, 'mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf', onProgress),
     ]);
 
     const { vlm, error } = await CactusVLM.init({

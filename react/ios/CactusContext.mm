@@ -1,5 +1,6 @@
 #import "CactusContext.h"
 #import <Metal/Metal.h>
+#import <sys/utsname.h>
 
 @implementation CactusContext
 
@@ -1005,6 +1006,23 @@
         [result addObject:@(sample)];
     }
     return result;
+}
+
+- (NSDictionary *)getDeviceInfo {
+    UIDevice *device = [UIDevice currentDevice];
+    NSString *deviceId = [[device identifierForVendor] UUIDString];
+    struct utsname systemInfo;
+    uname(&systemInfo);
+    NSString *model = [NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
+    NSString *os = [device systemName];
+    NSDictionary *deviceInfo = @{
+      @"deviceId": deviceId,
+      @"model": model,
+      @"make": @"Apple",
+      @"os": os
+    };
+    
+    return deviceInfo;
 }
 
 @end

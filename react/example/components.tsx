@@ -186,16 +186,13 @@ export const MessageField = ({
   </View>
 );
 
-export const LoadingScreen = ({ progress, currentFile }: { progress: number; currentFile: string }) => (
+export const LoadingScreen = ({ progress }: { progress: number }) => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
     <Text style={{ fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
       Initializing VLM...
     </Text>
     <Text style={{ fontSize: 16, marginBottom: 10 }}>
       {(progress * 100).toFixed(1)}%
-    </Text>
-    <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
-      {currentFile?.toString() || 'Loading...'}
     </Text>
   </View>
 ); 

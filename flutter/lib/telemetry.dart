@@ -1,11 +1,17 @@
 import 'dart:io';
 import 'dart:convert';
 import './types.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class TelemetryRecord {
   final String os;
   final String osVersion;
   final String framework;
+  final String? projectId;
+  final String? deviceId;
+  final String? deviceManufacturer;
+  final String? deviceModel;
   final Map<String, dynamic>? telemetryPayload;
   final Map<String, dynamic>? errorPayload;
   final String timestamp;
@@ -17,6 +23,10 @@ class TelemetryRecord {
     required this.os,
     required this.osVersion,
     required this.framework,
+    this.projectId,
+    this.deviceId,
+    this.deviceManufacturer,
+    this.deviceModel,
     this.telemetryPayload,
     this.errorPayload,
     required this.timestamp,
@@ -30,6 +40,10 @@ class TelemetryRecord {
       'os': os,
       'os_version': osVersion,
       'framework': framework,
+      'project_id': projectId,
+      'device_id': deviceId,
+      'device_manufacturer': deviceManufacturer,
+      'device_model': deviceModel,
       if (telemetryPayload != null) 'telemetry_payload': telemetryPayload,
       if (errorPayload != null) 'error_payload': errorPayload,
       'timestamp': timestamp,
@@ -82,21 +96,47 @@ class CactusTelemetry {
     _instance ??= CactusTelemetry._(config);
   }
 
-  static void track(Map<String, dynamic> payload, CactusInitParams options) {
+  static Future<void> track(Map<String, dynamic> payload, CactusInitParams options) async {
     autoInit();
-    _instance!._trackInternal(payload, options);
+    await _instance!._trackInternal(payload, options);
   }
 
-  static void error(Object error, CactusInitParams options) {
+  static Future<void> error(Object error, CactusInitParams options) async {
     autoInit();
-    _instance!._errorInternal(error, options);
+    await _instance!._errorInternal(error, options);
   }
 
-  void _trackInternal(Map<String, dynamic> payload, CactusInitParams options) {
+  static Future<(String, String, String)> _getDeviceInfo() async {
+    final deviceInfoPlugin = DeviceInfoPlugin();
+    String deviceId = 'unknown';
+    String make = 'unknown';
+    String model = 'unknown';
+    if (Platform.isAndroid) {
+      final AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
+      deviceId = androidInfo.id;
+      make = androidInfo.manufacturer;
+      model = androidInfo.model;
+    } else if (Platform.isIOS) {
+      final IosDeviceInfo iosInfo = await deviceInfoPlugin.iosInfo;
+      deviceId = iosInfo.identifierForVendor ?? 'unknown';
+      make = 'Apple';
+      model = iosInfo.utsname.machine;
+    }
+    return (deviceId, make, model);
+  }
+
+  Future<void> _trackInternal(Map<String, dynamic> payload, CactusInitParams options) async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final (deviceId, make, model) = await _getDeviceInfo();
+
     final record = TelemetryRecord(
       os: Platform.isIOS ? 'iOS' : 'Android',
       osVersion: Platform.operatingSystemVersion,
       framework: 'flutter',
+      projectId: '${packageInfo.packageName}@${packageInfo.version}',
+      deviceId: deviceId,
+      deviceManufacturer: make,
+      deviceModel: model,
       telemetryPayload: payload,
       timestamp: DateTime.now().toIso8601String(),
       modelFilename: _getFilename(options.modelPath ?? options.modelUrl),
@@ -107,7 +147,9 @@ class CactusTelemetry {
     _sendRecord(record);
   }
 
-  void _errorInternal(Object error, CactusInitParams options) {
+  Future<void> _errorInternal(Object error, CactusInitParams options) async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final (deviceId, make, model) = await _getDeviceInfo();
     final errorPayload = {
       'message': error.toString(),
       'type': error.runtimeType.toString(),
@@ -118,6 +160,10 @@ class CactusTelemetry {
       os: Platform.isIOS ? 'iOS' : 'Android',
       osVersion: Platform.operatingSystemVersion,
       framework: 'flutter',
+      projectId: '${packageInfo.packageName}@${packageInfo.version}',
+      deviceId: deviceId,
+      deviceManufacturer: make,
+      deviceModel: model,
       errorPayload: errorPayload,
       timestamp: DateTime.now().toIso8601String(),
       modelFilename: _getFilename(options.modelPath ?? options.modelUrl),
@@ -146,6 +192,7 @@ class CactusTelemetry {
       await response.drain(); 
       client.close();
     } catch (e) {
+      print('Error sending record: $e');
     }
   }
 } 

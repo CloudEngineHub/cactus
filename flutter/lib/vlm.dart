@@ -2,12 +2,11 @@ import 'dart:async';
 
 import './types.dart';
 import './context.dart';
-import './telemetary.dart';
+import './telemetry.dart';
 import './remote.dart';
 
 class CactusVLM {
   CactusContext? _context;
-  CactusInitParams? _initParams;
   
   CactusVLM._();
 
@@ -43,7 +42,6 @@ class CactusVLM {
     
     try {
       vlm._context = await CactusContext.init(initParams);
-      vlm._initParams = initParams;
     } catch (e) {
       CactusTelemetry.error(e, initParams);
       rethrow;
@@ -63,68 +61,38 @@ class CactusVLM {
     CactusTokenCallback? onToken,
     String mode = "local",
   }) async {
-    final startTime = DateTime.now();
-    bool firstTokenReceived = false;
-    DateTime? firstTokenTime;
-    
-    CactusTokenCallback? wrappedCallback;
-    if (onToken != null) {
-      wrappedCallback = (String token) {
-        if (!firstTokenReceived) {
-          firstTokenTime = DateTime.now();
-          firstTokenReceived = true;
-        }
-        return onToken(token);
-      };
-    }
 
     CactusCompletionResult? result;
     Exception? lastError;
 
     if (mode == "remote") {
-      result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+      result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, onToken);
     } else if (mode == "local") {
-      result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+      result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, onToken);
     } else if (mode == "localfirst") {
       try {
-        result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+        result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, onToken);
       } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
         try {
-          result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+          result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, onToken);
         } catch (remoteError) {
           throw lastError;
         }
       }
     } else if (mode == "remotefirst") {
       try {
-        result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+        result = await _handleRemoteCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, onToken);
       } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
         try {
-          result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, wrappedCallback);
+          result = await _handleLocalCompletion(messages, imagePaths, maxTokens, temperature, topK, topP, stopSequences, onToken);
         } catch (localError) {
           throw lastError;
         }
       }
     } else {
       throw ArgumentError('Invalid mode: $mode. Must be "local", "remote", "localfirst", or "remotefirst"');
-    }
-    
-    if (_initParams != null) {
-      final endTime = DateTime.now();
-      final totalTime = endTime.difference(startTime).inMilliseconds;
-      final tokPerSec = totalTime > 0 ? (result.tokensPredicted * 1000.0) / totalTime : null;
-      final ttft = firstTokenTime != null ? firstTokenTime!.difference(startTime).inMilliseconds : null;
-      
-      CactusTelemetry.track({
-        'event': 'completion',
-        'tok_per_sec': tokPerSec,
-        'toks_generated': result.tokensPredicted,
-        'ttft': ttft,
-        'num_images': imagePaths.length,
-        'mode': mode,
-      }, _initParams!);
     }
     
     return result;
