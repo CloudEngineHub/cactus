@@ -702,6 +702,71 @@ export default function TTSDemo() {
 }
 ```
 
+## Tool Calling (Function Calling)
+❗️This feature is currently in development. The latest stable version for tool calling is `v0.0.1`❗️
+
+Tool calling lets you to build powerful agents that can perform actions like setting reminders, fetching real-time data, or controlling other applications.
+
+This feature is accessible via the low-level API. The `completionWithTools` method orchestrates the conversation between the user, the model, and your tools in a loop:
+- The model receives the user's prompt and a list of available tools.
+- If the model decides to use a tool, the library executes your function with the arguments provided by the model.
+- The function's return value is sent back to the model as context.
+- The model uses this new information to formulate its final response.
+
+This cycle repeats until the model generates a text response or a recursion limit is met.
+
+### Defining Tools
+First, create an instance of the Tools class. Then, define your functions and add them to the tools instance with a description and a parameter schema. The description is crucial, as it helps the model understand when and how to use your tool.
+
+```typescript
+import { Tools } from 'cactus-react-native';
+
+const tools = new Tools();
+
+async function getCurrentWeather(location: string) {
+  // In a real app, you would fetch this from an API
+return { location: location, temperature: "72°F" };
+}
+
+tools.add(
+  getCurrentWeather,
+  "Get the current weather in a given location.", // Description for the model
+  {
+    location: {
+      type: "string",
+      description: "The city and state, e.g. San Francisco, CA",
+      required: true,
+    }
+  }
+);
+```
+
+## Executing with Tools
+Use the `completionWithTools` method from a `LlamaContext` instance. You must use a model that has been instruction-tuned for tool/function calling (e.g., Qwen2.5).
+
+```typescript
+import { initLlama, Tools } from 'cactus-react-native';
+
+// ...Assuming 'tools' is defined as in the example above
+
+const context = await initLlama({ 
+  model: '/path/to/tool-capable-model.gguf',
+});
+
+const messages = [
+  { role: 'user', content: "What's the weather like in Tokyo?" }
+];
+
+const result = await context.completionWithTools({
+  messages: messages,
+  tools: tools,
+});
+
+console.log(result.content);
+// Expected output from the model:
+// "The current weather in San Francisco is 72°F."
+```
+
 ## Advanced Features
 
 ### Session Management
