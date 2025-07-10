@@ -3,6 +3,11 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$ROOT_DIR/flutter"
 
+echo "Creating Flutter example platform folders..."
+cd example
+flutter create --platforms=ios,android .
+cd ..
+
 echo "Copying iOS frameworks to Flutter project..."
 rm -rf ios/cactus.xcframework
 cp -R "$ROOT_DIR/ios"/cactus.xcframework ios/
