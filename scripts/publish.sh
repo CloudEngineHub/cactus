@@ -15,13 +15,14 @@ rm -rf "$ROOT_DIR/react/android/src/main/jniLibs/x86_64"
 "$SCRIPT_DIR/build-react.sh"
 "$SCRIPT_DIR/build-flutter.sh"
 
+cd "$ROOT_DIR/react"
+npm version patch
+npm publish
+
 cd "$ROOT_DIR"
 git add .
 git commit -m "chore: publish"
 git push origin main
-
-cd "$ROOT_DIR/react"
-yarn release 
 
 cd "$ROOT_DIR/flutter"
 flutter pub publish 

@@ -1,13 +1,13 @@
 # Cactus React Native
 
-Running LLMs, VLMs, and TTS models directly on mobile devices.
+Run LLMs, VLMs, and TTS models directly on mobile devices.
 
 ## Installation
 
 ```json
 {
   "dependencies": {
-    "cactus-react-native": "^0.2.0",
+    "cactus-react-native": "^0.2.1",
     "react-native-fs": "^2.20.0"
   }
 }
