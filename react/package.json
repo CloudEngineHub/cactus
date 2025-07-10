@@ -10,6 +10,7 @@
   "files": [
     "src",
     "lib",
+    "scripts",
     "ios",
     "ios/CMakeLists.txt",
     "android",
