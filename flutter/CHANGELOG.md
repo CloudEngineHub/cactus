@@ -1,3 +1,8 @@
+## 0.2.0
+
+* Changed `visionUrl`/`visionFilename` to `mmprojUrl`/`mmprojFilename` in `CactusVLM.init()`
+* Updated to match actual implementation and align with other platforms
+
 ## 0.1.4
 
 * added telemetry

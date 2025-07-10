@@ -1,49 +1,49 @@
 # Cactus React Native
 
-A powerful React Native library for running Large Language Models (LLMs) and Vision Language Models (VLMs) directly on mobile devices, with full support for chat completions, multimodal inputs, embeddings, text-to-speech and advanced features.
+Running LLMs, VLMs, and TTS models directly on mobile devices.
 
 ## Installation
 
-```bash
-npm install cactus-react-native react-native-fs
-# or
-yarn add cactus-react-native react-native-fs
+```json
+{
+  "dependencies": {
+    "cactus-react-native": "^0.2.0",
+    "react-native-fs": "^2.20.0"
+  }
+}
 ```
 
-**Additional Setup:**
-- For iOS: `cd ios && npx pod-install` or `yarn pod-install`
-- For Android: Ensure your `minSdkVersion` is 24 or higher
-
-> **Important**: `react-native-fs` is required for file system access to download and manage model files locally.
+**Setup:**
+- iOS: `cd ios && npx pod-install`
+- Android: Ensure `minSdkVersion` 24+
 
 ## Quick Start
 
-### Basic Text Completion
-
 ```typescript
 import { CactusLM } from 'cactus-react-native';
+import RNFS from 'react-native-fs';
 
-// Initialize a language model
+const modelPath = `${RNFS.DocumentDirectoryPath}/model.gguf`;
+
 const { lm, error } = await CactusLM.init({
-  model: '/path/to/your/model.gguf',
+  model: modelPath,
   n_ctx: 2048,
   n_threads: 4,
 });
-if (error) throw error; // handle error gracefully
 
-// Generate text
-const messages = [{ role: 'user', content: 'Hello, how are you?' }];
-const params = { n_predict: 100, temperature: 0.7 };
+if (error) throw error;
 
-const result = await lm.completion(messages, params);
+const messages = [{ role: 'user', content: 'Hello!' }];
+const result = await lm.completion(messages, { n_predict: 100 });
 console.log(result.text);
+lm.release();
 ```
 
-### Complete Chat App Example
+## Streaming Chat
 
 ```typescript
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { CactusLM } from 'cactus-react-native';
 import RNFS from 'react-native-fs';
 
@@ -52,111 +52,170 @@ interface Message {
   content: string;
 }
 
-export default function ChatApp() {
+export default function ChatScreen() {
   const [lm, setLM] = useState<CactusLM | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     initializeModel();
+    return () => {
+      lm?.release();
+    };
   }, []);
 
-  async function initializeModel() {
+  const initializeModel = async () => {
     try {
-      // Download model (example URL)
       const modelUrl = 'https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf';
-      const modelPath = `${RNFS.DocumentDirectoryPath}/model.gguf`;
-      
-      // Download if not exists
-      if (!(await RNFS.exists(modelPath))) {
-        await RNFS.downloadFile({
-          fromUrl: modelUrl,
-          toFile: modelPath,
-        }).promise;
-      }
+      const modelPath = await downloadModel(modelUrl, 'qwen-600m.gguf');
 
-      // Initialize language model
-      const { lm, error } = await CactusLM.init({
+      const { lm: model, error } = await CactusLM.init({
         model: modelPath,
         n_ctx: 2048,
         n_threads: 4,
-        n_gpu_layers: 99, // Use GPU acceleration
+        n_gpu_layers: 99,
       });
-      if (error) throw error; // handle error gracefully
 
-      setLM(lm);
-      setLoading(false);
+      if (error) throw error;
+      setLM(model);
     } catch (error) {
       console.error('Failed to initialize model:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
-  async function sendMessage() {
-    if (!lm || !input.trim()) return;
+  const downloadModel = async (url: string, filename: string): Promise<string> => {
+    const path = `${RNFS.DocumentDirectoryPath}/${filename}`;
+    
+    if (await RNFS.exists(path)) return path;
+    
+    console.log('Downloading model...');
+    await RNFS.downloadFile({
+      fromUrl: url,
+      toFile: path,
+      progress: (res) => {
+        const progress = res.bytesWritten / res.contentLength;
+        console.log(`Download progress: ${(progress * 100).toFixed(1)}%`);
+      },
+    }).promise;
+    
+    return path;
+  };
 
-    const userMessage: Message = { role: 'user', content: input };
+  const sendMessage = async () => {
+    if (!lm || !input.trim() || isGenerating) return;
+
+    const userMessage: Message = { role: 'user', content: input.trim() };
     const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    setMessages([...newMessages, { role: 'assistant', content: '' }]);
     setInput('');
+    setIsGenerating(true);
 
     try {
-      const params = {
-        n_predict: 256,
+      let response = '';
+      await lm.completion(newMessages, {
+        n_predict: 200,
         temperature: 0.7,
         stop: ['</s>', '<|end|>'],
-      };
-
-      const result = await lm.completion(newMessages, params);
-
-      const assistantMessage: Message = { 
-        role: 'assistant', 
-        content: result.text 
-      };
-      setMessages([...newMessages, assistantMessage]);
+      }, (token) => {
+        response += token.token;
+        setMessages(prev => [
+          ...prev.slice(0, -1),
+          { role: 'assistant', content: response }
+        ]);
+      });
     } catch (error) {
-      console.error('Completion failed:', error);
+      console.error('Generation failed:', error);
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: 'Error generating response' }
+      ]);
+    } finally {
+      setIsGenerating(false);
     }
-  }
+  };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading model...</Text>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 16 }}>Loading model...</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
-      {/* Messages */}
-      <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+      <ScrollView style={{ flex: 1, padding: 16 }}>
         {messages.map((msg, index) => (
-          <Text key={index} style={{ 
-            backgroundColor: msg.role === 'user' ? '#007AFF' : '#f0f0f0',
-            color: msg.role === 'user' ? 'white' : 'black',
-            padding: 8,
-            margin: 4,
-            borderRadius: 8,
-          }}>
-            {msg.content}
-          </Text>
+          <View
+            key={index}
+            style={{
+              backgroundColor: msg.role === 'user' ? '#007AFF' : '#ffffff',
+              padding: 12,
+              marginVertical: 4,
+              borderRadius: 12,
+              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '80%',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.2,
+              shadowRadius: 2,
+              elevation: 2,
+            }}
+          >
+            <Text style={{ 
+              color: msg.role === 'user' ? '#ffffff' : '#000000',
+              fontSize: 16,
+            }}>
+              {msg.content}
+            </Text>
+          </View>
         ))}
-      </View>
-
-      {/* Input */}
-      <View style={{ flexDirection: 'row' }}>
+      </ScrollView>
+      
+      <View style={{
+        flexDirection: 'row',
+        padding: 16,
+        backgroundColor: '#ffffff',
+        borderTopWidth: 1,
+        borderTopColor: '#e0e0e0',
+      }}>
         <TextInput
-          style={{ flex: 1, borderWidth: 1, padding: 8, borderRadius: 4 }}
+          style={{
+            flex: 1,
+            borderWidth: 1,
+            borderColor: '#e0e0e0',
+            borderRadius: 20,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            fontSize: 16,
+            backgroundColor: '#f8f8f8',
+          }}
           value={input}
           onChangeText={setInput}
           placeholder="Type a message..."
+          multiline
+          onSubmitEditing={sendMessage}
         />
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={sendMessage}
-          style={{ backgroundColor: '#007AFF', padding: 8, borderRadius: 4, marginLeft: 8 }}
+          disabled={isGenerating || !input.trim()}
+          style={{
+            backgroundColor: isGenerating ? '#cccccc' : '#007AFF',
+            borderRadius: 20,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            marginLeft: 8,
+            justifyContent: 'center',
+          }}
         >
-          <Text style={{ color: 'white' }}>Send</Text>
+          <Text style={{ color: '#ffffff', fontWeight: 'bold' }}>
+            {isGenerating ? '...' : 'Send'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -164,360 +223,403 @@ export default function ChatApp() {
 }
 ```
 
-## File Path Requirements
-
-**Critical**: Cactus requires **absolute local file paths**, not Metro bundler URLs or asset references.
-
-### ❌ Won't Work
-```typescript
-// Metro bundler URLs
-'http://localhost:8081/assets/model.gguf'
-
-// React Native asset requires  
-require('./assets/model.gguf')
-
-// Relative paths
-'./models/model.gguf'
-```
-
-### ✅ Will Work
-```typescript
-import RNFS from 'react-native-fs';
-
-// Absolute paths in app directories
-const modelPath = `${RNFS.DocumentDirectoryPath}/model.gguf`;
-const imagePath = `${RNFS.DocumentDirectoryPath}/image.jpg`;
-
-// Downloaded/copied files
-const downloadModel = async () => {
-  const modelUrl = 'https://example.com/model.gguf';
-  const localPath = `${RNFS.DocumentDirectoryPath}/model.gguf`;
-  
-  await RNFS.downloadFile({
-    fromUrl: modelUrl,
-    toFile: localPath,
-  }).promise;
-  
-  return localPath; // Use this path with Cactus
-};
-```
-
-### Image Assets
-For images, you need to copy them to local storage first:
-
-```typescript
-// Copy bundled asset to local storage
-const copyAssetToLocal = async (assetName: string): Promise<string> => {
-  const assetPath = `${RNFS.MainBundlePath}/${assetName}`;
-  const localPath = `${RNFS.DocumentDirectoryPath}/${assetName}`;
-  
-  if (!(await RNFS.exists(localPath))) {
-    await RNFS.copyFile(assetPath, localPath);
-  }
-  
-  return localPath;
-};
-
-// Usage
-const imagePath = await copyAssetToLocal('demo.jpg');
-const params = { images: [imagePath], n_predict: 200 };
-const result = await vlm.completion(messages, params);
-```
-
-### External Images
-Download external images to local storage:
-
-```typescript
-const downloadImage = async (imageUrl: string): Promise<string> => {
-  const localPath = `${RNFS.DocumentDirectoryPath}/temp_image.jpg`;
-  
-  await RNFS.downloadFile({
-    fromUrl: imageUrl,
-    toFile: localPath,
-  }).promise;
-  
-  return localPath;
-};
-```
-
 ## Core APIs
 
-### CactusLM (Language Model)
-
-For text-only language models:
+### CactusLM
 
 ```typescript
 import { CactusLM } from 'cactus-react-native';
 
-// Initialize
-const lm = await CactusLM.init({
+const { lm, error } = await CactusLM.init({
   model: '/path/to/model.gguf',
-  n_ctx: 4096,           // Context window size
-  n_batch: 512,          // Batch size for processing
-  n_threads: 4,          // Number of threads
-  n_gpu_layers: 99,      // GPU layers (0 = CPU only)
+  n_ctx: 2048,
+  n_threads: 4,
+  n_gpu_layers: 99,
+  embedding: true,
 });
 
-// Text completion
-const messages = [
-  { role: 'system', content: 'You are a helpful assistant.' },
-  { role: 'user', content: 'What is the capital of France?' },
-];
-
-const params = {
+const messages = [{ role: 'user', content: 'What is AI?' }];
+const result = await lm.completion(messages, {
   n_predict: 200,
   temperature: 0.7,
-  top_p: 0.9,
-  stop: ['</s>', '\n\n'],
-};
+  stop: ['</s>'],
+});
 
-const result = await lm.completion(messages, params);
-
-// Embeddings
-const embeddingResult = await lm.embedding('Your text here');
-console.log('Embedding vector:', embeddingResult.embedding);
-
-// Cleanup
-await lm.rewind(); // Clear conversation
-await lm.release(); // Release resources
+const embedding = await lm.embedding('Your text here');
+await lm.rewind();
+await lm.release();
 ```
 
-### CactusVLM (Vision Language Model)
-
-For multimodal models that can process both text and images:
+### CactusVLM
 
 ```typescript
 import { CactusVLM } from 'cactus-react-native';
 
-// Initialize with multimodal projector
-const vlm = await CactusVLM.init({
+const { vlm, error } = await CactusVLM.init({
   model: '/path/to/vision-model.gguf',
   mmproj: '/path/to/mmproj.gguf',
   n_ctx: 2048,
-  n_threads: 4,
-  n_gpu_layers: 99, // GPU for main model, CPU for projector
 });
 
-// Image + text completion
-const messages = [{ role: 'user', content: 'What do you see in this image?' }];
-const params = {
+const messages = [{ role: 'user', content: 'Describe this image' }];
+const result = await vlm.completion(messages, {
   images: ['/path/to/image.jpg'],
   n_predict: 200,
   temperature: 0.3,
-};
+});
 
-const result = await vlm.completion(messages, params);
-
-// Text-only completion (same interface)
-const textMessages = [{ role: 'user', content: 'Tell me a joke' }];
-const textParams = { n_predict: 100 };
-const textResult = await vlm.completion(textMessages, textParams);
-
-// Cleanup
-await vlm.rewind();
 await vlm.release();
 ```
 
-### CactusTTS (Text-to-Speech)
-
-For text-to-speech generation:
+### CactusTTS
 
 ```typescript
-import { CactusTTS } from 'cactus-react-native';
+import { CactusTTS, initLlama } from 'cactus-react-native';
 
-// Initialize with vocoder
-const tts = await CactusTTS.init({
+const context = await initLlama({
   model: '/path/to/tts-model.gguf',
-  vocoder: '/path/to/vocoder.gguf',
   n_ctx: 1024,
-  n_threads: 4,
 });
 
-// Generate speech
-const text = 'Hello, this is a test of text-to-speech functionality.';
-const params = {
-  voice_id: 0,
-  temperature: 0.7,
-  speed: 1.0,
-};
+const tts = await CactusTTS.init(context, '/path/to/vocoder.gguf');
 
-const audioResult = await tts.generateSpeech(text, params);
-console.log('Audio data:', audioResult.audio_data);
+const audio = await tts.generate(
+  'Hello, this is text-to-speech',
+  '{"speaker_id": 0}'
+);
 
-// Advanced token-based generation
-const tokens = await tts.getGuideTokens('Your text here');
-const audio = await tts.decodeTokens(tokens);
-
-// Cleanup
 await tts.release();
 ```
 
-## Text Completion
+## Advanced Usage
 
-### Basic Completion
+### Model Manager
 
 ```typescript
-const lm = await CactusLM.init({
+class ModelManager {
+  private models = new Map<string, CactusLM | CactusVLM>();
+  
+  async loadLM(name: string, modelPath: string): Promise<CactusLM> {
+    if (this.models.has(name)) {
+      return this.models.get(name) as CactusLM;
+    }
+    
+    const { lm, error } = await CactusLM.init({
+      model: modelPath,
+      n_ctx: 2048,
+    });
+    
+    if (error) throw error;
+    this.models.set(name, lm);
+    return lm;
+  }
+  
+  async loadVLM(name: string, modelPath: string, mmprojPath: string): Promise<CactusVLM> {
+    if (this.models.has(name)) {
+      return this.models.get(name) as CactusVLM;
+    }
+    
+    const { vlm, error } = await CactusVLM.init({
+      model: modelPath,
+      mmproj: mmprojPath,
+    });
+    
+    if (error) throw error;
+    this.models.set(name, vlm);
+    return vlm;
+  }
+  
+  async releaseModel(name: string): Promise<void> {
+    const model = this.models.get(name);
+    if (model) {
+      await model.release();
+      this.models.delete(name);
+    }
+  }
+  
+  async releaseAll(): Promise<void> {
+    await Promise.all(
+      Array.from(this.models.values()).map(model => model.release())
+    );
+    this.models.clear();
+  }
+}
+
+const modelManager = new ModelManager();
+```
+
+### File Management Hook
+
+```typescript
+import { useState, useCallback } from 'react';
+import RNFS from 'react-native-fs';
+
+interface DownloadProgress {
+  progress: number;
+  isDownloading: boolean;
+  error: string | null;
+}
+
+export const useModelDownload = () => {
+  const [downloads, setDownloads] = useState<Map<string, DownloadProgress>>(new Map());
+  
+  const downloadModel = useCallback(async (url: string, filename: string): Promise<string> => {
+    const path = `${RNFS.DocumentDirectoryPath}/${filename}`;
+    
+    if (await RNFS.exists(path)) {
+      const stats = await RNFS.stat(path);
+      if (stats.size > 0) return path;
+    }
+    
+    setDownloads(prev => new Map(prev.set(filename, {
+      progress: 0,
+      isDownloading: true,
+      error: null,
+    })));
+    
+    try {
+      await RNFS.downloadFile({
+        fromUrl: url,
+        toFile: path,
+        progress: (res) => {
+          const progress = res.bytesWritten / res.contentLength;
+          setDownloads(prev => new Map(prev.set(filename, {
+            progress,
+            isDownloading: true,
+            error: null,
+          })));
+        },
+      }).promise;
+      
+      setDownloads(prev => new Map(prev.set(filename, {
+        progress: 1,
+        isDownloading: false,
+        error: null,
+      })));
+      
+      return path;
+    } catch (error) {
+      setDownloads(prev => new Map(prev.set(filename, {
+        progress: 0,
+        isDownloading: false,
+        error: error.message,
+      })));
+      throw error;
+    }
+  }, []);
+  
+  return { downloadModel, downloads };
+};
+```
+
+### Vision Chat Component
+
+```typescript
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, Alert } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { CactusVLM } from 'cactus-react-native';
+import RNFS from 'react-native-fs';
+
+export default function VisionChat() {
+  const [vlm, setVLM] = useState<CactusVLM | null>(null);
+  const [imagePath, setImagePath] = useState<string | null>(null);
+  const [response, setResponse] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  useEffect(() => {
+    initializeVLM();
+    return () => {
+      vlm?.release();
+    };
+  }, []);
+
+  const initializeVLM = async () => {
+    try {
+      const modelUrl = 'https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf';
+      const mmprojUrl = 'https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf';
+      
+      const [modelPath, mmprojPath] = await Promise.all([
+        downloadFile(modelUrl, 'smolvlm-model.gguf'),
+        downloadFile(mmprojUrl, 'smolvlm-mmproj.gguf'),
+      ]);
+
+      const { vlm: model, error } = await CactusVLM.init({
+        model: modelPath,
+        mmproj: mmprojPath,
+        n_ctx: 2048,
+      });
+
+      if (error) throw error;
+      setVLM(model);
+    } catch (error) {
+      console.error('Failed to initialize VLM:', error);
+      Alert.alert('Error', 'Failed to initialize vision model');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const downloadFile = async (url: string, filename: string): Promise<string> => {
+    const path = `${RNFS.DocumentDirectoryPath}/${filename}`;
+    
+    if (await RNFS.exists(path)) return path;
+    
+    await RNFS.downloadFile({ fromUrl: url, toFile: path }).promise;
+    return path;
+  };
+
+  const pickImage = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        includeBase64: false,
+      },
+      (response) => {
+        if (response.assets && response.assets[0]) {
+          setImagePath(response.assets[0].uri!);
+          setResponse('');
+        }
+      }
+    );
+  };
+
+  const analyzeImage = async () => {
+    if (!vlm || !imagePath) return;
+
+    setIsAnalyzing(true);
+    try {
+      const messages = [{ role: 'user', content: 'Describe this image in detail' }];
+      
+      let analysisResponse = '';
+      const result = await vlm.completion(messages, {
+        images: [imagePath],
+        n_predict: 300,
+        temperature: 0.3,
+      }, (token) => {
+        analysisResponse += token.token;
+        setResponse(analysisResponse);
+      });
+
+      setResponse(analysisResponse || result.text);
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      Alert.alert('Error', 'Failed to analyze image');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading vision model...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, padding: 16 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>
+        Vision Chat
+      </Text>
+      
+      {imagePath && (
+        <Image
+          source={{ uri: imagePath }}
+          style={{
+            width: '100%',
+            height: 200,
+            borderRadius: 8,
+            marginBottom: 16,
+          }}
+          resizeMode="contain"
+        />
+      )}
+      
+      <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+        <TouchableOpacity
+          onPress={pickImage}
+          style={{
+            backgroundColor: '#007AFF',
+            padding: 12,
+            borderRadius: 8,
+            marginRight: 8,
+            flex: 1,
+          }}
+        >
+          <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+            Pick Image
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          onPress={analyzeImage}
+          disabled={!imagePath || isAnalyzing}
+          style={{
+            backgroundColor: !imagePath || isAnalyzing ? '#cccccc' : '#34C759',
+            padding: 12,
+            borderRadius: 8,
+            flex: 1,
+          }}
+        >
+          <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+            {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={{
+        flex: 1,
+        backgroundColor: '#f8f8f8',
+        borderRadius: 8,
+        padding: 16,
+      }}>
+        <Text style={{ fontSize: 16, lineHeight: 24 }}>
+          {response || 'Select an image and tap Analyze to get started'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+```
+
+### Cloud Fallback
+
+```typescript
+const { lm } = await CactusLM.init({
   model: '/path/to/model.gguf',
   n_ctx: 2048,
-});
+}, undefined, 'your_cactus_token');
 
-const messages = [
-  { role: 'user', content: 'Write a short poem about coding' }
-];
+// Try local first, fallback to cloud if local fails
+const embedding = await lm.embedding('text', undefined, 'localfirst');
 
-const params = {
-  n_predict: 200,
-  temperature: 0.8,
-  top_p: 0.9,
-  stop: ['</s>', '\n\n'],
-};
+// Vision models also support cloud fallback
+const { vlm } = await CactusVLM.init({
+  model: '/path/to/model.gguf',
+  mmproj: '/path/to/mmproj.gguf',
+}, undefined, 'your_cactus_token');
 
-const result = await lm.completion(messages, params);
-
-console.log(result.text);
-console.log(`Tokens: ${result.tokens_predicted}`);
-console.log(`Speed: ${result.timings.predicted_per_second.toFixed(2)} tokens/sec`);
-```
-
-### Streaming Completion
-
-```typescript
-const result = await lm.completion(messages, params, (token) => {
-  // Called for each generated token
-  console.log('Token:', token.token);
-  updateUI(token.token);
-});
-```
-
-### Advanced Parameters
-
-```typescript
-const params = {
-  // Generation control
-  n_predict: 256,        // Max tokens to generate
-  temperature: 0.7,      // Randomness (0.0 - 2.0)
-  top_p: 0.9,           // Nucleus sampling
-  top_k: 40,            // Top-k sampling
-  min_p: 0.05,          // Minimum probability
-  
-  // Repetition control
-  penalty_repeat: 1.1,   // Repetition penalty
-  penalty_freq: 0.0,     // Frequency penalty
-  penalty_present: 0.0,  // Presence penalty
-  
-  // Stop conditions
-  stop: ['</s>', '<|end|>', '\n\n'],
-  ignore_eos: false,
-  
-  // Sampling methods
-  mirostat: 0,          // Mirostat sampling (0=disabled)
-  mirostat_tau: 5.0,    // Target entropy
-  mirostat_eta: 0.1,    // Learning rate
-  
-  // Advanced
-  seed: -1,             // Random seed (-1 = random)
-  n_probs: 0,           // Return token probabilities
-};
-```
-
-## Multimodal (Vision)
-
-### Setup Vision Model
-
-```typescript
-import { CactusVLM } from 'cactus-react-native';
-
-const vlm = await CactusVLM.init({
-  model: '/path/to/vision-model.gguf',
-  mmproj: '/path/to/mmproj.gguf',  // Multimodal projector
-  n_ctx: 4096,
-});
-```
-
-### Image Analysis
-
-```typescript
-// Analyze single image
-const messages = [{ role: 'user', content: 'Describe this image in detail' }];
-const params = {
+const result = await vlm.completion(messages, {
   images: ['/path/to/image.jpg'],
-  n_predict: 200,
-  temperature: 0.3,
-};
-
-const result = await vlm.completion(messages, params);
-console.log(result.text);
+  mode: 'localfirst',
+});
 ```
 
-### Multi-Image Analysis
+### Embeddings & Similarity
 
 ```typescript
-const imagePaths = [
-  '/path/to/image1.jpg',
-  '/path/to/image2.jpg',
-  '/path/to/image3.jpg'
-];
-
-const messages = [{ role: 'user', content: 'Compare these images and explain the differences' }];
-const params = {
-  images: imagePaths,
-  n_predict: 300,
-  temperature: 0.4,
-};
-
-const result = await vlm.completion(messages, params);
-```
-
-### Conversation with Images
-
-```typescript
-const conversation = [
-  { role: 'user', content: 'What do you see in this image?' }
-];
-
-const params = {
-  images: ['/path/to/image.jpg'],
-  n_predict: 256,
-  temperature: 0.3,
-};
-
-const result = await vlm.completion(conversation, params);
-```
-
-## Embeddings
-
-### Text Embeddings
-
-```typescript
-// Enable embeddings during initialization
-const lm = await CactusLM.init({
-  model: '/path/to/embedding-model.gguf',
-  embedding: true,        // Enable embedding mode
-  n_ctx: 512,            // Smaller context for embeddings
+const { lm } = await CactusLM.init({
+  model: '/path/to/model.gguf',
+  embedding: true,
 });
 
-// Generate embeddings
-const text = 'Your text here';
-const result = await lm.embedding(text);
-console.log('Embedding vector:', result.embedding);
-console.log('Dimensions:', result.embedding.length);
-```
+const embedding1 = await lm.embedding('machine learning');
+const embedding2 = await lm.embedding('artificial intelligence');
 
-### Batch Embeddings
-
-```typescript
-const texts = [
-  'The quick brown fox',
-  'Machine learning is fascinating',
-  'React Native development'
-];
-
-const embeddings = await Promise.all(
-  texts.map(text => lm.embedding(text))
-);
-
-// Calculate similarity
 function cosineSimilarity(a: number[], b: number[]): number {
   const dotProduct = a.reduce((sum, ai, i) => sum + ai * b[i], 0);
   const magnitudeA = Math.sqrt(a.reduce((sum, ai) => sum + ai * ai, 0));
@@ -525,396 +627,49 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (magnitudeA * magnitudeB);
 }
 
-const similarity = cosineSimilarity(
-  embeddings[0].embedding,
-  embeddings[1].embedding
-);
+const similarity = cosineSimilarity(embedding1.embedding, embedding2.embedding);
+console.log('Similarity:', similarity);
 ```
 
-## Text-to-Speech (TTS)
+## Error Handling & Performance
 
-Cactus supports text-to-speech through vocoder models, allowing you to generate speech from text.
-
-### Setup TTS Model
+### Production Error Handling
 
 ```typescript
-import { CactusTTS } from 'cactus-react-native';
+async function safeModelInit(modelPath: string): Promise<CactusLM> {
+  const configs = [
+    { model: modelPath, n_ctx: 4096, n_gpu_layers: 99 },
+    { model: modelPath, n_ctx: 2048, n_gpu_layers: 99 },
+    { model: modelPath, n_ctx: 2048, n_gpu_layers: 0 },
+    { model: modelPath, n_ctx: 1024, n_gpu_layers: 0 },
+  ];
 
-const tts = await CactusTTS.init({
-  model: '/path/to/text-model.gguf',
-  vocoder: '/path/to/vocoder-model.gguf',
-  n_ctx: 2048,
-});
-```
-
-### Basic Text-to-Speech
-
-```typescript
-const text = 'Hello, this is a test of text-to-speech functionality.';
-const params = {
-  voice_id: 0,        // Speaker voice ID
-  temperature: 0.7,   // Speech variation
-  speed: 1.0,         // Speech speed
-};
-
-const result = await tts.generateSpeech(text, params);
-
-console.log('Audio data:', result.audio_data);
-console.log('Sample rate:', result.sample_rate);
-console.log('Audio format:', result.format);
-```
-
-### Advanced TTS with Token Control
-
-```typescript
-// Get guide tokens for precise control
-const tokensResult = await tts.getGuideTokens(
-  'This text will be converted to speech tokens.'
-);
-
-console.log('Guide tokens:', tokensResult.tokens);
-console.log('Token count:', tokensResult.tokens.length);
-
-// Decode tokens to audio
-const audioResult = await tts.decodeTokens(tokensResult.tokens);
-
-console.log('Decoded audio:', audioResult.audio_data);
-console.log('Duration:', audioResult.duration_seconds);
-```
-
-### Complete TTS Example
-
-```typescript
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { Audio } from 'expo-av';
-import RNFS from 'react-native-fs';
-import { CactusTTS } from 'cactus-react-native';
-
-export default function TTSDemo() {
-  const [tts, setTTS] = useState<CactusTTS | null>(null);
-  const [text, setText] = useState('Hello, this is a test of speech synthesis.');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-
-  useEffect(() => {
-    initializeTTS();
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
+  for (const config of configs) {
+    try {
+      const { lm, error } = await CactusLM.init(config);
+      if (error) throw error;
+      return lm;
+    } catch (error) {
+      console.warn('Config failed:', config, error.message);
+      if (configs.indexOf(config) === configs.length - 1) {
+        throw new Error(`All configurations failed. Last error: ${error.message}`);
       }
-    };
-  }, []);
+    }
+  }
+  
+  throw new Error('Model initialization failed');
+}
 
-  async function initializeTTS() {
+async function safeCompletion(lm: CactusLM, messages: any[], retries = 3): Promise<any> {
+  for (let i = 0; i < retries; i++) {
     try {
-      // Download and initialize models
-      const modelPath = await downloadModel();
-      const vocoderPath = await downloadVocoder();
-
-      const cactusTTS = await CactusTTS.init({
-        model: modelPath,
-        vocoder: vocoderPath,
-        n_ctx: 1024,
-        n_threads: 4,
-      });
-
-      setTTS(cactusTTS);
+      return await lm.completion(messages, { n_predict: 200 });
     } catch (error) {
-      console.error('Failed to initialize TTS:', error);
-      Alert.alert('Error', 'Failed to initialize TTS');
-    }
-  }
-
-  async function generateSpeech() {
-    if (!tts || !text.trim()) return;
-
-    setIsGenerating(true);
-    try {
-      const params = {
-        voice_id: 0,
-        temperature: 0.7,
-        speed: 1.0,
-      };
-
-      const result = await tts.generateSpeech(text, params);
-
-      // Save audio to file
-      const audioPath = `${RNFS.DocumentDirectoryPath}/speech.wav`;
-      await RNFS.writeFile(audioPath, result.audio_data, 'base64');
-
-      // Play audio
-      const { sound: audioSound } = await Audio.Sound.createAsync({
-        uri: `file://${audioPath}`,
-      });
-      
-      setSound(audioSound);
-      await audioSound.playAsync();
-
-      console.log(`Generated speech: ${result.duration_seconds}s`);
-    } catch (error) {
-      console.error('Speech generation failed:', error);
-      Alert.alert('Error', 'Failed to generate speech');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  // Helper functions for downloading models would go here...
-
-  return (
-    <View style={{ flex: 1, padding: 16 }}>
-      <Text style={{ fontSize: 18, marginBottom: 16 }}>
-        Text-to-Speech Demo
-      </Text>
-      
-      <TextInput
-        style={{
-          borderWidth: 1,
-          borderColor: '#ddd',
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 16,
-          minHeight: 100,
-        }}
-        value={text}
-        onChangeText={setText}
-        placeholder="Enter text to convert to speech..."
-        multiline
-      />
-      
-      <TouchableOpacity
-        onPress={generateSpeech}
-        disabled={isGenerating || !tts}
-        style={{
-          backgroundColor: isGenerating ? '#ccc' : '#007AFF',
-          padding: 16,
-          borderRadius: 8,
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
-          {isGenerating ? 'Generating...' : 'Generate Speech'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-```
-
-## Tool Calling (Function Calling)
-❗️This feature is currently in development. The latest stable version for tool calling is `v0.0.1`❗️
-
-Tool calling lets you to build powerful agents that can perform actions like setting reminders, fetching real-time data, or controlling other applications.
-
-This feature is accessible via the low-level API. The `completionWithTools` method orchestrates the conversation between the user, the model, and your tools in a loop:
-- The model receives the user's prompt and a list of available tools.
-- If the model decides to use a tool, the library executes your function with the arguments provided by the model.
-- The function's return value is sent back to the model as context.
-- The model uses this new information to formulate its final response.
-
-This cycle repeats until the model generates a text response or a recursion limit is met.
-
-### Defining Tools
-First, create an instance of the Tools class. Then, define your functions and add them to the tools instance with a description and a parameter schema. The description is crucial, as it helps the model understand when and how to use your tool.
-
-```typescript
-import { Tools } from 'cactus-react-native';
-
-const tools = new Tools();
-
-async function getCurrentWeather(location: string) {
-  // In a real app, you would fetch this from an API
-return { location: location, temperature: "72°F" };
-}
-
-tools.add(
-  getCurrentWeather,
-  "Get the current weather in a given location.", // Description for the model
-  {
-    location: {
-      type: "string",
-      description: "The city and state, e.g. San Francisco, CA",
-      required: true,
-    }
-  }
-);
-```
-
-## Executing with Tools
-Use the `completionWithTools` method from a `LlamaContext` instance. You must use a model that has been instruction-tuned for tool/function calling (e.g., Qwen2.5).
-
-```typescript
-import { initLlama, Tools } from 'cactus-react-native';
-
-// ...Assuming 'tools' is defined as in the example above
-
-const context = await initLlama({ 
-  model: '/path/to/tool-capable-model.gguf',
-});
-
-const messages = [
-  { role: 'user', content: "What's the weather like in Tokyo?" }
-];
-
-const result = await context.completionWithTools({
-  messages: messages,
-  tools: tools,
-});
-
-console.log(result.content);
-// Expected output from the model:
-// "The current weather in San Francisco is 72°F."
-```
-
-## Advanced Features
-
-### Session Management
-
-For the low-level API, you can still access session management:
-
-```typescript
-import { initLlama } from 'cactus-react-native';
-
-const context = await initLlama({ model: '/path/to/model.gguf' });
-
-// Save session
-const tokensKept = await context.saveSession('/path/to/session.bin', {
-  tokenSize: 1024  // Number of tokens to keep
-});
-
-// Load session
-const sessionInfo = await context.loadSession('/path/to/session.bin');
-console.log(`Loaded ${sessionInfo.tokens_loaded} tokens`);
-```
-
-### LoRA Adapters
-
-```typescript
-const context = await initLlama({ model: '/path/to/model.gguf' });
-
-// Apply LoRA adapters
-await context.applyLoraAdapters([
-  { path: '/path/to/lora1.gguf', scaled: 1.0 },
-  { path: '/path/to/lora2.gguf', scaled: 0.8 }
-]);
-
-// Get loaded adapters
-const adapters = await context.getLoadedLoraAdapters();
-console.log('Loaded adapters:', adapters);
-
-// Remove adapters
-await context.removeLoraAdapters();
-```
-
-### Structured Output (JSON)
-
-```typescript
-const messages = [
-  { role: 'user', content: 'Extract information about this person: John Doe, 30 years old, software engineer from San Francisco' }
-];
-
-const params = {
-  response_format: {
-    type: 'json_object',
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        age: { type: 'number' },
-        profession: { type: 'string' },
-        location: { type: 'string' }
-      },
-      required: ['name', 'age']
-    }
-  }
-};
-
-const result = await lm.completion(messages, params);
-const person = JSON.parse(result.text);
-console.log(person.name); // "John Doe"
-```
-
-### Performance Monitoring
-
-```typescript
-const result = await lm.completion(messages, { n_predict: 100 });
-
-console.log('Performance metrics:');
-console.log(`Prompt tokens: ${result.timings.prompt_n}`);
-console.log(`Generated tokens: ${result.timings.predicted_n}`);
-console.log(`Prompt speed: ${result.timings.prompt_per_second.toFixed(2)} tokens/sec`);
-console.log(`Generation speed: ${result.timings.predicted_per_second.toFixed(2)} tokens/sec`);
-console.log(`Total time: ${(result.timings.prompt_ms + result.timings.predicted_ms).toFixed(0)}ms`);
-```
-
-## Best Practices
-
-### Model Management
-
-```typitten
-class ModelManager {
-  private models = new Map<string, CactusLM | CactusVLM | CactusTTS>();
-
-  async loadLM(name: string, modelPath: string): Promise<CactusLM> {
-    if (this.models.has(name)) {
-      return this.models.get(name)! as CactusLM;
-    }
-
-    const lm = await CactusLM.init({ model: modelPath });
-    this.models.set(name, lm);
-    return lm;
-  }
-
-  async loadVLM(name: string, modelPath: string, mmprojPath: string): Promise<CactusVLM> {
-    if (this.models.has(name)) {
-      return this.models.get(name)! as CactusVLM;
-    }
-
-    const vlm = await CactusVLM.init({ model: modelPath, mmproj: mmprojPath });
-    this.models.set(name, vlm);
-    return vlm;
-  }
-
-  async unloadModel(name: string): Promise<void> {
-    const model = this.models.get(name);
-    if (model) {
-      await model.release();
-      this.models.delete(name);
-    }
-  }
-
-  async unloadAll(): Promise<void> {
-    await Promise.all(
-      Array.from(this.models.values()).map(model => model.release())
-    );
-    this.models.clear();
-  }
-}
-```
-
-### Error Handling
-
-```typescript
-async function safeCompletion(lm: CactusLM, messages: any[]) {
-  try {
-    const result = await lm.completion(messages, {
-      n_predict: 256,
-      temperature: 0.7,
-    });
-    return { success: true, data: result };
-  } catch (error) {
-    if (error.message.includes('Context is busy')) {
-      // Handle concurrent requests
-      await new Promise(resolve => setTimeout(resolve, 100));
-      return safeCompletion(lm, messages);
-    } else if (error.message.includes('Context not found')) {
-      // Handle context cleanup
-      throw new Error('Model context was released');
-    } else {
-      // Handle other errors
-      console.error('Completion failed:', error);
-      return { success: false, error: error.message };
+      if (error.message.includes('Context is busy') && i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+      throw error;
     }
   }
 }
@@ -923,103 +678,112 @@ async function safeCompletion(lm: CactusLM, messages: any[]) {
 ### Memory Management
 
 ```typescript
-// Monitor memory usage
-const checkMemory = () => {
-  if (Platform.OS === 'android') {
-    // Android-specific memory monitoring
-    console.log('Memory warning - consider releasing unused models');
+import { AppState, AppStateStatus } from 'react-native';
+
+class AppModelManager {
+  private modelManager = new ModelManager();
+  
+  constructor() {
+    AppState.addEventListener('change', this.handleAppStateChange);
   }
+  
+  private handleAppStateChange = (nextAppState: AppStateStatus) => {
+    if (nextAppState === 'background') {
+      // Release non-essential models when app goes to background
+      this.modelManager.releaseAll();
+    }
+  };
+  
+  async getModel(name: string, modelPath: string): Promise<CactusLM> {
+    try {
+      return await this.modelManager.loadLM(name, modelPath);
+    } catch (error) {
+      // Handle low memory by releasing other models
+      await this.modelManager.releaseAll();
+      return await this.modelManager.loadLM(name, modelPath);
+    }
+  }
+}
+```
+
+### Performance Optimization
+
+```typescript
+// Optimize for device capabilities
+const getOptimalConfig = () => {
+  const { OS } = Platform;
+  const isHighEndDevice = true; // Implement device detection logic
+  
+  return {
+    n_ctx: isHighEndDevice ? 4096 : 2048,
+    n_gpu_layers: OS === 'ios' ? 99 : 0, // iOS generally has better GPU support
+    n_threads: isHighEndDevice ? 6 : 4,
+    n_batch: isHighEndDevice ? 512 : 256,
+  };
 };
 
-// Release models when app goes to background
-import { AppState } from 'react-native';
-
-AppState.addEventListener('change', (nextAppState) => {
-  if (nextAppState === 'background') {
-    // Release non-essential models
-    modelManager.unloadAll();
-  }
+const config = getOptimalConfig();
+const { lm } = await CactusLM.init({
+  model: modelPath,
+  ...config,
 });
 ```
 
 ## API Reference
 
-### High-Level APIs
+### CactusLM
 
-- `CactusLM.init(params: ContextParams): Promise<CactusLM>` - Initialize language model
-- `CactusVLM.init(params: VLMContextParams): Promise<CactusVLM>` - Initialize vision language model  
-- `CactusTTS.init(params: TTSContextParams): Promise<CactusTTS>` - Initialize text-to-speech model
+**init(params, onProgress?, cactusToken?)**
+- `model: string` - Path to GGUF model file
+- `n_ctx?: number` - Context size (default: 2048)
+- `n_threads?: number` - CPU threads (default: 4)
+- `n_gpu_layers?: number` - GPU layers (default: 99)
+- `embedding?: boolean` - Enable embeddings (default: false)
+- `n_batch?: number` - Batch size (default: 512)
 
-### CactusLM Methods
+**completion(messages, params?, callback?)**
+- `messages: Array<{role: string, content: string}>` - Chat messages
+- `n_predict?: number` - Max tokens (default: -1)
+- `temperature?: number` - Randomness 0.0-2.0 (default: 0.8)
+- `top_p?: number` - Nucleus sampling (default: 0.95)
+- `top_k?: number` - Top-k sampling (default: 40)
+- `stop?: string[]` - Stop sequences
+- `callback?: (token) => void` - Streaming callback
 
-- `completion(messages: CactusOAICompatibleMessage[], params: CompletionParams, callback?: (token: TokenData) => void): Promise<NativeCompletionResult>`
-- `embedding(text: string, params?: EmbeddingParams): Promise<NativeEmbeddingResult>`
-- `rewind(): Promise<void>` - Clear conversation history
-- `release(): Promise<void>` - Release resources
+**embedding(text, params?, mode?)**
+- `text: string` - Text to embed
+- `mode?: string` - 'local' | 'localfirst' | 'remotefirst' | 'remote'
 
-### CactusVLM Methods
+### CactusVLM
 
-- `completion(messages: CactusOAICompatibleMessage[], params: VLMCompletionParams, callback?: (token: TokenData) => void): Promise<NativeCompletionResult>`
-- `rewind(): Promise<void>` - Clear conversation history
-- `release(): Promise<void>` - Release resources
+**init(params, onProgress?, cactusToken?)**
+- All CactusLM params plus:
+- `mmproj: string` - Path to multimodal projector
 
-### CactusTTS Methods
+**completion(messages, params?, callback?)**
+- All CactusLM completion params plus:
+- `images?: string[]` - Array of image paths
+- `mode?: string` - Cloud fallback mode
 
-- `generateSpeech(text: string, params: TTSSpeechParams): Promise<NativeAudioCompletionResult>`
-- `getGuideTokens(text: string): Promise<NativeAudioTokensResult>`
-- `decodeTokens(tokens: number[]): Promise<NativeAudioDecodeResult>`
-- `release(): Promise<void>` - Release resources
+### Types
 
-### Low-Level Functions (Advanced)
-
-For advanced use cases, the original low-level API is still available:
-
-- `initLlama(params: ContextParams): Promise<LlamaContext>` - Initialize a model context
-- `releaseAllLlama(): Promise<void>` - Release all contexts
-- `setContextLimit(limit: number): Promise<void>` - Set maximum contexts
-- `toggleNativeLog(enabled: boolean): Promise<void>` - Enable/disable native logging
-
-## Troubleshooting
-
-### Common Issues
-
-**Model Loading Fails**
 ```typescript
-// Check file exists and is accessible
-if (!(await RNFS.exists(modelPath))) {
-  throw new Error('Model file not found');
+interface CactusOAICompatibleMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
-// Check file size
-const stats = await RNFS.stat(modelPath);
-console.log('Model size:', stats.size);
+interface NativeCompletionResult {
+  text: string;
+  tokens_predicted: number;
+  tokens_evaluated: number;
+  timings: {
+    predicted_per_second: number;
+    prompt_per_second: number;
+  };
+}
+
+interface NativeEmbeddingResult {
+  embedding: number[];
+}
 ```
-
-**Out of Memory**
-```typescript
-// Reduce context size
-const lm = await CactusLM.init({
-  model: '/path/to/model.gguf',
-  n_ctx: 1024,     // Reduce from 4096
-  n_batch: 128,    // Reduce batch size
-});
-```
-
-**GPU Issues**
-```typescript
-// Disable GPU if having issues
-const lm = await CactusLM.init({
-  model: '/path/to/model.gguf',
-  n_gpu_layers: 0,  // Use CPU only
-});
-```
-
-### Performance Tips
-
-1. **Use appropriate context sizes** - Larger contexts use more memory
-2. **Optimize batch sizes** - Balance between speed and memory
-3. **Cache models** - Don't reload models unnecessarily
-4. **Use GPU acceleration** - When available and stable
-5. **Monitor memory usage** - Release models when not needed
-
-This documentation covers the essential usage patterns for cactus-react-native. For more examples, check the [example apps](../examples/) in the repository.

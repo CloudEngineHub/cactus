@@ -12,9 +12,9 @@ class CactusVLM {
 
   static Future<CactusVLM> init({
     required String modelUrl,
-    required String visionUrl,
+    required String mmprojUrl,
     String? modelFilename,
-    String? visionFilename,
+    String? mmprojFilename,
     String? chatTemplate,
     int contextSize = 2048,
     int gpuLayers = 0,
@@ -31,8 +31,8 @@ class CactusVLM {
     final initParams = CactusInitParams(
       modelUrl: modelUrl,
       modelFilename: modelFilename,
-      mmprojUrl: visionUrl,
-      mmprojFilename: visionFilename,
+      mmprojUrl: mmprojUrl,
+      mmprojFilename: mmprojFilename,
       chatTemplate: chatTemplate,
       contextSize: contextSize,
       gpuLayers: gpuLayers,
