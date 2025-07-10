@@ -94,7 +94,10 @@ class CactusManager {
       throw new Error('Cactus VLM not initialized');
     }
 
-    const messages = [{ role: 'user', content: userMessage.content }];
+    const messages = [
+      { role: 'system', content: 'You are a helpful AI assistant. Always provide neat, straightforward, short and relevant responses. Be concise and direct.' },
+      { role: 'user', content: userMessage.content }
+    ];
     
     const params = {
       images: userMessage.images,

@@ -6,6 +6,23 @@ cd "$ROOT_DIR/flutter"
 echo "Creating Flutter example platform folders..."
 cd example
 flutter create --platforms=ios,android .
+
+echo "Setting iOS minimum version to 13.0..."
+if [ -f "ios/Podfile" ]; then
+    sed -i '' "s/# platform :ios, '12.0'/platform :ios, '13.0'/" ios/Podfile
+    echo "Updated Podfile to use iOS 13.0"
+else
+    echo "Warning: ios/Podfile not found"
+fi
+
+if [ -f "ios/Runner.xcodeproj/project.pbxproj" ]; then
+    # Set iOS deployment target to 13.0 in Xcode project
+    sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' ios/Runner.xcodeproj/project.pbxproj
+    echo "Updated Xcode project iOS deployment target to 13.0"
+else
+    echo "Warning: Xcode project file not found"
+fi
+
 cd ..
 
 echo "Copying iOS frameworks to Flutter project..."

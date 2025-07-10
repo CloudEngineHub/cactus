@@ -47,8 +47,11 @@ class CactusService {
     String response = '';
     
     try {
+      final systemPrompt = ChatMessage(role: 'system', content: 'You are a helpful AI assistant. Always provide neat, straightforward, short and relevant responses. Be concise and direct.');
+      final conversationMessages = [systemPrompt, ...messages.value.where((m) => m.content.isNotEmpty).toList()];
+      
       final result = await model!.completion(
-        messages.value.where((m) => m.content.isNotEmpty).toList(),
+        conversationMessages,
         imagePaths: _stagedImagePath != null ? [_stagedImagePath!] : [],
         maxTokens: 200,
         // mode: "localfirst", // enterprise feature: try local, fall back to cloud if local inference fails and vice versa

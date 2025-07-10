@@ -18,17 +18,17 @@ dependencies:
 ```dart
 import 'package:cactus/cactus.dart';
 
-final lm = await CactusLM.init(
+  final lm = await CactusLM.init(
   modelUrl: 'https://huggingface.co/model.gguf',
-  contextSize: 2048,
-);
+    contextSize: 2048,
+  );
 
-final result = await lm.completion([
+  final result = await lm.completion([
   ChatMessage(role: 'user', content: 'Hello!')
-], maxTokens: 100, temperature: 0.7);
+  ], maxTokens: 100, temperature: 0.7);
 
 print(result.text);
-lm.dispose();
+  lm.dispose();
 ```
 
 ### Streaming Chat
@@ -55,14 +55,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initModel() async {
-    _lm = await CactusLM.init(
+      _lm = await CactusLM.init(
       modelUrl: 'https://huggingface.co/model.gguf',
       contextSize: 2048,
-      onProgress: (progress, status, isError) {
+        onProgress: (progress, status, isError) {
         print('$status ${progress != null ? '${(progress * 100).toInt()}%' : ''}');
-      },
-    );
-    setState(() => _isLoading = false);
+        },
+      );
+      setState(() => _isLoading = false);
   }
 
   Future<void> _sendMessage() async {
@@ -79,10 +79,10 @@ class _ChatScreenState extends State<ChatScreen> {
     await _lm!.completion(
       _messages.where((m) => m.content.isNotEmpty).toList(),
       maxTokens: 200,
-      temperature: 0.7,
-      onToken: (token) {
+        temperature: 0.7,
+        onToken: (token) {
         response += token;
-        setState(() {
+          setState(() {
           _messages.last = ChatMessage(role: 'assistant', content: response);
         });
         return true;
@@ -257,7 +257,7 @@ class ModelManager {
     ], maxTokens: 100);
     return result.text;
   }
-  
+
   void clearContext() => _lm?.rewind();
   void dispose() => _lm?.dispose();
 }
@@ -273,7 +273,7 @@ final vlm = await CactusVLM.init(
   mmprojUrl: 'https://huggingface.co/mmproj.gguf',
 );
 
-final result = await vlm.completion([
+    final result = await vlm.completion([
   ChatMessage(role: 'user', content: 'What do you see?')
 ], imagePaths: ['/path/to/image.jpg'], maxTokens: 200);
 
@@ -303,7 +303,7 @@ class _VisionChatState extends State<VisionChat> {
   }
 
   Future<void> _initVLM() async {
-    _vlm = await CactusVLM.init(
+      _vlm = await CactusVLM.init(
       modelUrl: 'https://huggingface.co/model.gguf',
       mmprojUrl: 'https://huggingface.co/mmproj.gguf',
     );
@@ -326,7 +326,7 @@ class _VisionChatState extends State<VisionChat> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+      return Scaffold(
       appBar: AppBar(title: Text('Vision Chat')),
       body: Column(
         children: [
