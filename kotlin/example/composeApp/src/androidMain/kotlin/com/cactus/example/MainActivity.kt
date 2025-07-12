@@ -1,4 +1,4 @@
-package com.jetbrains.kmpapp
+package com.cactus.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,11 +12,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            // Remove when https://issuetracker.google.com/issues/364713509 is fixed
             LaunchedEffect(isSystemInDarkTheme()) {
                 enableEdgeToEdge()
             }
             App()
         }
     }
-}
+} 
