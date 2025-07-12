@@ -1,4 +1,3 @@
-import com.vanniktech.maven.publish.SonatypeHost
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -45,35 +44,10 @@ android {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
-
-    signAllPublications()
-
-    coordinates(group.toString(), "cactus", version.toString())
-
     pom {
         name = "Cactus"
-        description = "Run AI locally in you apps"
-        inceptionYear = "2024"
+        description = "Run AI locally in your apps"
+        inceptionYear = "2025"
         url = "https://github.com/cactus-compute/cactus/"
-        licenses {
-            license {
-                name = "XXX"
-                url = "YYY"
-                distribution = "ZZZ"
-            }
-        }
-        developers {
-            developer {
-                id = "cactus-compute."
-                name = "Cactus Compute, Inc."
-                url = "https://cactuscompute.com"
-            }
-        }
-        scm {
-            url = "https://github.com/cactus-compute/cactus/"
-            connection = "https://github.com/cactus-compute/cactus.git"
-            developerConnection = "https://github.com/cactus-compute/cactus.git"
-        }
     }
 }
