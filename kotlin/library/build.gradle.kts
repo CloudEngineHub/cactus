@@ -11,7 +11,6 @@ group = "com.cactus"
 version = "0.2.0"
 
 kotlin {
-    jvm()
     androidTarget {
         publishLibraryVariants("release")
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
@@ -19,14 +18,35 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
+    
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "CactusKotlin"
+        }
+        iosTarget.compilations.getByName("main") {
+            cinterops {
+                val cactus by creating {
+                    defFile(project.file("src/iosMain/cinterop/cactus.def"))
+                    packageName("com.cactus.native")
+                    includeDirs(project.file("libs/ios/cactus.xcframework/ios-arm64/cactus.framework/Headers"))
+                }
+            }
+        }
+    }
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 //put your multiplatform dependencies here
+            }
+        }
+        val androidMain by getting {
+            dependencies {
+                implementation("net.java.dev.jna:jna:5.13.0")
             }
         }
     }
@@ -41,6 +61,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("libs/android/jniLibs")
+        }
     }
 }
 
