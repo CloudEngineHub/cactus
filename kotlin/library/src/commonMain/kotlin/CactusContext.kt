@@ -3,7 +3,7 @@ package com.cactus
 typealias CactusContextHandle = Long
 
 expect object CactusContext {
-    fun initContext(params: CactusInitParams): CactusContextHandle
+    fun initContext(params: CactusInitParams): CactusContextHandle?
     fun freeContext(handle: CactusContextHandle)
     fun completion(handle: CactusContextHandle, params: CactusCompletionParams): CactusCompletionResult
     fun multimodalCompletion(handle: CactusContextHandle, params: CactusCompletionParams, mediaPaths: List<String>): CactusCompletionResult

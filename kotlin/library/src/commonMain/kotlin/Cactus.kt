@@ -5,7 +5,7 @@ class Cactus {
     
     fun initialize(params: CactusInitParams): Boolean {
         return try {
-            val contextHandle = CactusContext.initContext(params)
+            val contextHandle = CactusContext.initContext(params) ?: 0L
             if (contextHandle != 0L) {
                 handle = contextHandle
                 true

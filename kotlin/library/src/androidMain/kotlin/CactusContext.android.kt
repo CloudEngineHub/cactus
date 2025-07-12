@@ -136,7 +136,7 @@ internal interface CactusLibrary : Library {
 actual object CactusContext {
     private val lib = CactusLibrary.INSTANCE
     
-    actual fun initContext(params: CactusInitParams): CactusContextHandle {
+    actual fun initContext(params: CactusInitParams): CactusContextHandle? {
         val cParams = CactusInitParamsC().apply {
             model_path = params.modelPath
             chat_template = params.chatTemplate
@@ -155,13 +155,11 @@ actual object CactusContext {
             cache_type_v = params.cacheTypeV
         }
         val handle = lib.cactus_init_context_c(cParams)
-        return handle?.let { Pointer.nativeValue(it) } ?: 0L
+        return handle?.let { Pointer.nativeValue(it) }
     }
     
     actual fun freeContext(handle: CactusContextHandle) {
-        if (handle != 0L) {
-            lib.cactus_free_context_c(Pointer(handle))
-        }
+        lib.cactus_free_context_c(Pointer(handle))
     }
     
     actual fun completion(handle: CactusContextHandle, params: CactusCompletionParams): CactusCompletionResult {
