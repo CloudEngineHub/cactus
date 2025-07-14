@@ -1,3 +1,4 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package com.cactus.example
 
 import io.ktor.client.*
@@ -6,15 +7,17 @@ import io.ktor.client.statement.*
 import io.ktor.utils.io.*
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.reinterpret
 import kotlinx.coroutines.yield
 import platform.Foundation.*
 
 actual fun getModelCacheDir(): String {
-    val cacheDir = NSSearchPathForDirectoriesInDomains(
+    val cacheDirs = NSSearchPathForDirectoriesInDomains(
         NSCachesDirectory,
         NSUserDomainMask,
         true
-    ).firstObject() as NSString
+    )
+    val cacheDir = (cacheDirs[0] as NSString)
     return cacheDir.toString()
 }
 
@@ -59,7 +62,7 @@ actual suspend fun downloadModelStreaming(url: String, fileName: String, onProgr
                     
                     // Write to NSOutputStream
                     buffer.usePinned { pinned ->
-                        outputStream?.write(pinned.addressOf(0), bytesRead.toULong())
+                        outputStream?.write(pinned.addressOf(0).reinterpret(), bytesRead.toULong())
                     }
                     
                     downloadedBytes += bytesRead
