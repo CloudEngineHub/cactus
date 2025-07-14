@@ -15,6 +15,10 @@ export default function HomeScreen() {
   useEffect(() => {
     const initializeCactus = async () => {
       try {
+        // Stress-test: initialize & release 10 times to verify memory stability
+        await cactus.stressInitialize(10, (p) => setInitProgress(p));
+
+        // Final initialization for actual usage
         await cactus.initialize((progress) => {
           setInitProgress(progress);
         });

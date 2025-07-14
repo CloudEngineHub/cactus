@@ -1,4 +1,6 @@
 import { initLlama, LlamaContext } from './index'
+// @ts-ignore
+import { Platform } from 'react-native'
 import type {
   ContextParams,
   CompletionParams,
@@ -31,10 +33,11 @@ export class CactusLM {
       setCactusToken(cactusToken);
     }
 
-    const configs = [
-      params,
-      { ...params, n_gpu_layers: 0 } 
-    ];
+    // Avoid two back-to-back loads on devices where GPU off-load is unsupported (Android).
+    const needGpuAttempt = Platform.OS !== 'android' && (params.n_gpu_layers ?? 0) > 0
+    const configs = needGpuAttempt
+      ? [params, { ...params, n_gpu_layers: 0 }]
+      : [{ ...params, n_gpu_layers: 0 }]
 
     for (const config of configs) {
       try {
