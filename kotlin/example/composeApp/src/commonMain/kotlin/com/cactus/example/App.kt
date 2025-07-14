@@ -11,15 +11,49 @@ import androidx.compose.ui.unit.dp
 import com.cactus.Cactus
 import com.cactus.CactusInitParams
 import com.cactus.CactusCompletionParams
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+
+expect fun getModelCacheDir(): String
+expect suspend fun downloadModelStreaming(url: String, fileName: String, onProgress: (Float) -> Unit): String?
 
 @Composable
 fun App() {
     var logs by remember { mutableStateOf(listOf<String>()) }
     var cactus by remember { mutableStateOf<Cactus?>(null) }
     var isInitialized by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf(0f) }
+    var modelPath by remember { mutableStateOf<String?>(null) }
+    
+    val scope = rememberCoroutineScope()
     
     fun addLog(message: String) {
         logs = logs + message
+    }
+    
+    suspend fun downloadModel(): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val modelUrl = "https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+                val fileName = "SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+                
+                addLog("Starting model download...")
+                
+                downloadModelStreaming(modelUrl, fileName) { progress ->
+                    downloadProgress = progress
+                }
+            } catch (e: Exception) {
+                addLog("Download failed: ${e.message}")
+                null
+            }
+        }
     }
     
     MaterialTheme {
@@ -35,29 +69,67 @@ fun App() {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             
+            if (isDownloading) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(progress = { downloadProgress })
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Downloading model: ${(downloadProgress * 100).toInt()}%")
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+            
             Button(
                 onClick = {
-                    addLog("Initializing Cactus...")
-                    try {
-                        val instance = Cactus()
-                        val params = CactusInitParams(
-                            modelPath = "/path/to/model.gguf",
-                            nCtx = 2048,
-                            nThreads = 4
-                        )
-                        val success = instance.initialize(params)
-                        if (success) {
-                            cactus = instance
-                            isInitialized = true
-                            addLog("✓ Cactus initialized successfully!")
+                    scope.launch {
+                        isDownloading = true
+                        downloadProgress = 0f
+                        val downloadedModelPath = downloadModel()
+                        isDownloading = false
+                        
+                        if (downloadedModelPath != null) {
+                            modelPath = downloadedModelPath
+                            addLog("✓ Model downloaded successfully!")
+                            addLog("Model saved to: $downloadedModelPath")
                         } else {
-                            addLog("✗ Failed to initialize Cactus")
+                            addLog("✗ Failed to download model")
                         }
-                    } catch (e: Exception) {
-                        addLog("✗ Error: ${e.message}")
                     }
                 },
-                enabled = !isInitialized
+                enabled = !isDownloading && modelPath == null
+            ) {
+                Text("Download Model")
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = {
+                    val currentModelPath = modelPath
+                    if (currentModelPath != null) {
+                        addLog("Initializing Cactus...")
+                        try {
+                            val instance = Cactus()
+                            val params = CactusInitParams(
+                                modelPath = currentModelPath,
+                                nCtx = 2048,
+                                nThreads = 4
+                            )
+                            val success = instance.initialize(params)
+                            if (success) {
+                                cactus = instance
+                                isInitialized = true
+                                addLog("✓ Cactus initialized successfully!")
+                            } else {
+                                addLog("✗ Failed to initialize Cactus")
+                            }
+                        } catch (e: Exception) {
+                            addLog("✗ Error: ${e.message}")
+                        }
+                    } else {
+                        addLog("Please download the model first")
+                    }
+                },
+                enabled = !isInitialized && modelPath != null && !isDownloading
             ) {
                 Text("Initialize Cactus")
             }
@@ -78,7 +150,7 @@ fun App() {
                         } catch (e: Exception) {
                             addLog("✗ Error getting model info: ${e.message}")
                         }
-                    } ?: addLog("Please initialize Cactus first")
+                    } ?: run { addLog("Please initialize Cactus first") }
                 },
                 enabled = isInitialized
             ) {
@@ -93,12 +165,14 @@ fun App() {
                         addLog("Tokenizing text...")
                         try {
                             val result = c.tokenize("Hello, world!")
-                            addLog("Tokens: ${result?.tokens?.contentToString()}")
-                            addLog("Token count: ${result?.count}")
+                            result?.let { r ->
+                                addLog("Tokens: ${r.tokens.contentToString()}")
+                                addLog("Token count: ${r.count}")
+                            }
                         } catch (e: Exception) {
                             addLog("✗ Error tokenizing: ${e.message}")
                         }
-                    } ?: addLog("Please initialize Cactus first")
+                    } ?: run { addLog("Please initialize Cactus first") }
                 },
                 enabled = isInitialized
             ) {
@@ -121,7 +195,7 @@ fun App() {
                         } catch (e: Exception) {
                             addLog("✗ Error running benchmark: ${e.message}")
                         }
-                    } ?: addLog("Please initialize Cactus first")
+                    } ?: run { addLog("Please initialize Cactus first") }
                 },
                 enabled = isInitialized
             ) {
@@ -148,7 +222,7 @@ fun App() {
                         } catch (e: Exception) {
                             addLog("✗ Error generating completion: ${e.message}")
                         }
-                    } ?: addLog("Please initialize Cactus first")
+                    } ?: run { addLog("Please initialize Cactus first") }
                 },
                 enabled = isInitialized
             ) {

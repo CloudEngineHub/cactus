@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.vanniktech.mavenPublish)
+    `maven-publish`
 }
 
 group = "com.cactus"
@@ -26,13 +26,39 @@ kotlin {
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "CactusKotlin"
+            
+            // Determine the correct architecture path for linking
+            val archPath = when (iosTarget.name) {
+                "iosArm64" -> "ios-arm64"
+                "iosX64" -> "ios-arm64_x86_64-simulator"  
+                "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
+                else -> "ios-arm64"
+            }
+            
+            val frameworkPath = project.file("libs/ios/cactus.xcframework/$archPath")
+            linkerOpts("-framework", "cactus", "-F", frameworkPath.absolutePath)
         }
         iosTarget.compilations.getByName("main") {
             cinterops {
                 val cactus by creating {
                     defFile(project.file("src/iosMain/cinterop/cactus.def"))
                     packageName("com.cactus.native")
-                    includeDirs(project.file("libs/ios/cactus.xcframework/ios-arm64/cactus.framework/Headers"))
+                    
+                    // Determine the correct architecture path
+                    val archPath = when (iosTarget.name) {
+                        "iosArm64" -> "ios-arm64"
+                        "iosX64" -> "ios-arm64_x86_64-simulator"  
+                        "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
+                        else -> "ios-arm64"
+                    }
+                    
+                    val frameworkPath = project.file("libs/ios/cactus.xcframework/$archPath")
+                    includeDirs(project.file("$frameworkPath/cactus.framework/Headers"))
+                    
+                    // Set compiler options dynamically
+                    compilerOpts("-framework", "Accelerate", "-framework", "Foundation", 
+                               "-framework", "Metal", "-framework", "MetalKit", 
+                               "-framework", "cactus", "-F", frameworkPath.absolutePath)
                 }
             }
         }
@@ -69,11 +95,14 @@ android {
     }
 }
 
-mavenPublishing {
-    pom {
-        name = "Cactus"
-        description = "Run AI locally in your apps"
-        inceptionYear = "2025"
-        url = "https://github.com/cactus-compute/cactus/"
+publishing {
+    publications {
+        withType<MavenPublication> {
+            pom {
+                name.set("Cactus")
+                description.set("Run AI locally in your apps")
+                url.set("https://github.com/cactus-compute/cactus/")
+            }
+        }
     }
 }

@@ -1,4 +1,1 @@
-headers = cactus_ffi.h
-libraries = cactus
-libraryPaths = ../../../libs/ios/cactus.xcframework/ios-arm64/cactus.framework
-compilerOpts = -framework Accelerate -framework Foundation -framework Metal -framework MetalKit 
+headers = cactus_ffi.h 

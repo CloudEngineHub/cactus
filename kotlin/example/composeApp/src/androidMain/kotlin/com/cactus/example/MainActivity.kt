@@ -10,6 +10,10 @@ import androidx.compose.runtime.LaunchedEffect
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize Android context for model file handling
+        initializeAndroidContext(this)
+        
         enableEdgeToEdge()
         setContent {
             LaunchedEffect(isSystemInDarkTheme()) {
