@@ -29,10 +29,11 @@ kotlin {
     }
 
     sourceSets {
-        androidMain.dependencies {
+                androidMain.dependencies {
             implementation(libs.androidx.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
+
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -60,21 +61,35 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/com/sun/jna/android-*/**"
+        }
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        getByName("debug") {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    
+
 }
 
 dependencies {

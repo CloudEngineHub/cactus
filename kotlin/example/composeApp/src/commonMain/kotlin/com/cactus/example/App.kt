@@ -108,12 +108,15 @@ fun App() {
                     if (currentModelPath != null) {
                         addLog("Initializing Cactus...")
                         try {
+                            addLog("Creating Cactus instance...")
                             val instance = Cactus()
+                            addLog("Setting up initialization parameters...")
                             val params = CactusInitParams(
                                 modelPath = currentModelPath,
                                 nCtx = 2048,
                                 nThreads = 4
                             )
+                            addLog("Calling initialize...")
                             val success = instance.initialize(params)
                             if (success) {
                                 cactus = instance
@@ -124,6 +127,7 @@ fun App() {
                             }
                         } catch (e: Exception) {
                             addLog("✗ Error: ${e.message}")
+                            addLog("Exception type: ${e::class.simpleName}")
                         }
                     } else {
                         addLog("Please download the model first")

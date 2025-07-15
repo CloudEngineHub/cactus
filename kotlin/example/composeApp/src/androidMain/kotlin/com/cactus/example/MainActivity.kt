@@ -8,6 +8,23 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
+    
+    companion object {
+        init {
+            try {
+                // Configure JNA for Android
+                System.setProperty("jna.nosys", "true")
+                System.setProperty("jna.noclasspath", "true")
+                
+                // Load the native library
+                System.loadLibrary("cactus")
+                println("Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                println("Failed to load native library: ${e.message}")
+            }
+        }
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
