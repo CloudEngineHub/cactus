@@ -347,7 +347,10 @@ Java_com_cactus_LlamaContext_initContext(
         }
         context_map[(long) llama->ctx] = llama;
     } else {
+        LOGE("[CACTUS] Failed to load model from path: %s", model_path_chars);
         llama_free(llama->ctx);
+        delete llama;
+        return -1;
     }
 
     std::vector<common_adapter_lora_info> lora;
@@ -378,8 +381,10 @@ Java_com_cactus_LlamaContext_initContext(
     env->ReleaseStringUTFChars(lora_str, lora_chars);
     int result = llama->applyLoraAdapters(lora);
     if (result != 0) {
-      LOGI("[Cactus] Failed to apply lora adapters");
+      LOGE("[CACTUS] Failed to apply lora adapters");
       llama_free(llama->ctx);
+      context_map.erase((long) llama->ctx);
+      delete llama;
       return -1;
     }
 

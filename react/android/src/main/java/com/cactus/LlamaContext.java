@@ -64,6 +64,17 @@ public class LlamaContext {
     if (!params.hasKey("model")) {
       throw new IllegalArgumentException("Missing required parameter: model");
     }
+    
+    String modelPath = params.getString("model");
+    File modelFile = new File(modelPath);
+    if (!modelFile.exists()) {
+      Log.e(NAME, "Model file does not exist: " + modelPath);
+      throw new IllegalArgumentException("Model file does not exist: " + modelPath);
+    }
+    if (!modelFile.canRead()) {
+      Log.e(NAME, "Model file is not readable: " + modelPath);
+      throw new IllegalArgumentException("Model file is not readable: " + modelPath);
+    }
     eventEmitter = reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class);
     this.id = id;
     this.context = initContext(
@@ -115,7 +126,8 @@ public class LlamaContext {
       params.hasKey("use_progress_callback") ? new LoadProgressCallback(this) : null
     );
     if (this.context == -1) {
-      throw new IllegalStateException("Failed to initialize context");
+      throw new IllegalStateException("Failed to initialize context for model: " + modelPath + 
+        ". Please check if the model file exists and is accessible.");
     }
     this.modelDetails = loadModelDetails(this.context);
     this.reactContext = reactContext;
