@@ -11,8 +11,8 @@
 		058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */; };
 		2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2152FB032600AC8F00CF470E /* iOSApp.swift */; };
 		7555FF83242A565900829871 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7555FF82242A565900829871 /* ContentView.swift */; };
-		CACTUS123456789012345678 /* cactus.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CACTUS123456789012345677 /* cactus.xcframework */; };
-		CACTUS123456789012345679 /* cactus.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CACTUS123456789012345677 /* cactus.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		CA1234567890ABCD12345679 /* cactus.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA1234567890ABCD12345678 /* cactus.framework */; };
+		CA1234567890ABCD1234567A /* cactus.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CA1234567890ABCD12345678 /* cactus.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,7 +23,7 @@
 		7555FF82242A565900829871 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB3632DC29227652001CCB65 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		CACTUS123456789012345677 /* cactus.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = cactus.xcframework; path = iosApp/Frameworks/cactus.xcframework; sourceTree = "<group>"; };
+		CA1234567890ABCD12345678 /* cactus.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = cactus.framework; path = iosApp/cactus.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -31,20 +31,20 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CACTUS123456789012345678 /* cactus.xcframework in Frameworks */,
+				CA1234567890ABCD12345679 /* cactus.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		CACTUS123456789012345680 /* Embed Frameworks */ = {
+		CA1234567890ABCD1234567B /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				CACTUS123456789012345679 /* cactus.xcframework in Embed Frameworks */,
+				CA1234567890ABCD1234567A /* cactus.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -63,7 +63,7 @@
 		42799AB246E5F90AF97AA0EF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				CACTUS123456789012345677 /* cactus.xcframework */,
+				CA1234567890ABCD12345678 /* cactus.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -117,7 +117,7 @@
 				7555FF77242A565900829871 /* Sources */,
 				B92378962B6B1156000C7307 /* Frameworks */,
 				7555FF79242A565900829871 /* Resources */,
-				CACTUS123456789012345680 /* Embed Frameworks */,
+				CA1234567890ABCD1234567B /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

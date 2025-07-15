@@ -18,26 +18,14 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
+
+
     
     listOf(
         iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "CactusKotlin"
-            
-            // Determine the correct architecture path for linking
-            val archPath = when (iosTarget.name) {
-                "iosArm64" -> "ios-arm64"
-                "iosX64" -> "ios-arm64_x86_64-simulator"  
-                "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
-                else -> "ios-arm64"
-            }
-            
-            val frameworkPath = project.file("libs/ios/cactus.xcframework/$archPath")
-            linkerOpts("-framework", "cactus", "-F", frameworkPath.absolutePath)
-        }
         iosTarget.compilations.getByName("main") {
             cinterops {
                 val cactus by creating {
@@ -105,4 +93,32 @@ publishing {
             }
         }
     }
+}
+
+// Package XCFramework as part of the library resources
+tasks.register<Copy>("packageIOSFramework") {
+    from("libs/ios/cactus.xcframework")
+    into("$buildDir/resources/ios/cactus.xcframework")
+}
+
+// Task to help developers set up the iOS framework
+tasks.register<Copy>("setupIOSFramework") {
+    description = "Copy the cactus.xcframework to your iOS project"
+    group = "cactus"
+    
+    from("libs/ios/cactus.xcframework")
+    into("../example/iosApp/iosApp/Frameworks/cactus.xcframework")
+    
+    doLast {
+        println("✅ Framework copied to iOS project")
+        println("Next steps:")
+        println("1. Open your Xcode project")
+        println("2. Add cactus.xcframework to your project")
+        println("3. Set it to 'Embed & Sign' in your target settings")
+    }
+}
+
+// Make sure iOS framework is packaged when building
+tasks.named("build") {
+    dependsOn("packageIOSFramework")
 }
