@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -116,6 +117,127 @@ tasks.register<Copy>("setupIOSFramework") {
         println("2. Add cactus.xcframework to your project")
         println("3. Set it to 'Embed & Sign' in your target settings")
     }
+}
+
+// Enhanced task that automatically configures Xcode project
+tasks.register("setupIOSFrameworkComplete") {
+    description = "Copy the cactus.xcframework and automatically configure Xcode project"
+    group = "cactus"
+    
+    dependsOn("setupIOSFramework")
+    
+    doLast {
+        val projectFile = file("../example/iosApp/iosApp.xcodeproj/project.pbxproj")
+        
+        if (!projectFile.exists()) {
+            throw GradleException("Xcode project not found at: ${projectFile.absolutePath}")
+        }
+        
+        // Create backup
+        val backupFile = file("${projectFile.absolutePath}.backup")
+        projectFile.copyTo(backupFile, overwrite = true)
+        
+        try {
+            val content = projectFile.readText()
+            val modifiedContent = addFrameworkToXcodeProject(content, "cactus")
+            projectFile.writeText(modifiedContent)
+            
+            println("✅ Framework copied and automatically configured in Xcode project")
+            println("✅ Framework set to 'Embed & Sign'")
+            println("🎉 Ready to build! Just open Xcode and build your project.")
+        } catch (e: Exception) {
+            // Restore backup on failure
+            backupFile.copyTo(projectFile, overwrite = true)
+            throw GradleException("Failed to modify Xcode project: ${e.message}. Backup restored.", e)
+        }
+    }
+}
+
+fun addFrameworkToXcodeProject(content: String, frameworkName: String): String {
+    if (content.contains("$frameworkName.xcframework")) {
+        println("Framework already exists in project, skipping modification")
+        return content
+    }
+    
+    // Generate unique UUIDs for Xcode project entries
+    val fileRefUUID = generateXcodeUUID("${frameworkName}_fileRef")
+    val buildFileUUID = generateXcodeUUID("${frameworkName}_buildFile") 
+    val embedFileUUID = generateXcodeUUID("${frameworkName}_embedFile")
+    val copyPhaseUUID = generateXcodeUUID("${frameworkName}_copyPhase")
+    
+    var modifiedContent = content
+    
+    // 1. Add to PBXFileReference section (add just before /* End PBXFileReference section */)
+    val fileRefPattern = Regex("(/\\* End PBXFileReference section \\*/)")
+    val fileRefEntry = "\t\t$fileRefUUID /* $frameworkName.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = iosApp/Frameworks/$frameworkName.xcframework; sourceTree = \"<group>\"; };\n"
+    modifiedContent = modifiedContent.replace(fileRefPattern) {
+        fileRefEntry + it.value
+    }
+    
+    // 2. Add to PBXBuildFile section (add just before /* End PBXBuildFile section */)
+    val buildFilePattern = Regex("(/\\* End PBXBuildFile section \\*/)")
+    val buildFileEntry = "\t\t$buildFileUUID /* $frameworkName.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = $fileRefUUID /* $frameworkName.xcframework */; };\n"
+    val embedFileEntry = "\t\t$embedFileUUID /* $frameworkName.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = $fileRefUUID /* $frameworkName.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };\n"
+    modifiedContent = modifiedContent.replace(buildFilePattern) {
+        buildFileEntry + embedFileEntry + it.value
+    }
+    
+    // 3. Add to PBXFrameworksBuildPhase section - find the frameworks build phase
+    val frameworkPhasePattern = Regex("(isa = PBXFrameworksBuildPhase;[\\s\\S]*?files = \\()([\\s\\S]*?)(\\);)")
+    modifiedContent = modifiedContent.replace(frameworkPhasePattern) { match ->
+        val prefix = match.groupValues[1]
+        val existing = match.groupValues[2]
+        val suffix = match.groupValues[3]
+        val newEntry = if (existing.trim().isEmpty()) {
+            "\n\t\t\t\t$buildFileUUID /* $frameworkName.xcframework in Frameworks */,\n\t\t\t"
+        } else {
+            "$existing\t\t\t\t$buildFileUUID /* $frameworkName.xcframework in Frameworks */,\n\t\t\t"
+        }
+        "$prefix$newEntry$suffix"
+    }
+    
+    // 4. Add PBXCopyFilesBuildPhase section if not exists
+    if (!modifiedContent.contains("Embed Frameworks")) {
+        val copyPhasePattern = Regex("(/\\* End PBXCopyFilesBuildPhase section \\*/)")
+        val copyPhaseEntry = "\t\t$copyPhaseUUID /* Embed Frameworks */ = {\n\t\t\tisa = PBXCopyFilesBuildPhase;\n\t\t\tbuildActionMask = 2147483647;\n\t\t\tdstPath = \"\";\n\t\t\tdstSubfolderSpec = 10;\n\t\t\tfiles = (\n\t\t\t\t$embedFileUUID /* $frameworkName.xcframework in Embed Frameworks */,\n\t\t\t);\n\t\t\tname = \"Embed Frameworks\";\n\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t};\n"
+        modifiedContent = modifiedContent.replace(copyPhasePattern) {
+            copyPhaseEntry + it.value
+        }
+        
+        // Add to target buildPhases
+        val buildPhasesPattern = Regex("(buildPhases = \\()([\\s\\S]*?)(\\);)")
+        modifiedContent = modifiedContent.replace(buildPhasesPattern) { match ->
+            val prefix = match.groupValues[1]
+            val existing = match.groupValues[2]
+            val suffix = match.groupValues[3]
+            val newEntry = "$existing\t\t\t\t$copyPhaseUUID /* Embed Frameworks */,\n\t\t\t"
+            "$prefix$newEntry$suffix"
+        }
+    }
+    
+    // 5. Add to Frameworks group (avoid duplicate addition)
+    val frameworksGroupPattern = Regex("(42799AB246E5F90AF97AA0EF /\\* Frameworks \\*/ = \\{[\\s\\S]*?children = \\()([\\s\\S]*?)(\\);)")
+    if (modifiedContent.contains("42799AB246E5F90AF97AA0EF")) {
+        modifiedContent = modifiedContent.replace(frameworksGroupPattern) { match ->
+            val prefix = match.groupValues[1]
+            val existing = match.groupValues[2]
+            val suffix = match.groupValues[3]
+            val newEntry = if (existing.trim().isEmpty()) {
+                "\n\t\t\t\t$fileRefUUID /* $frameworkName.xcframework */,\n\t\t\t"
+            } else {
+                "$existing\t\t\t\t$fileRefUUID /* $frameworkName.xcframework */,\n\t\t\t"
+            }
+            "$prefix$newEntry$suffix"
+        }
+    }
+    
+    return modifiedContent
+}
+
+fun generateXcodeUUID(seed: String): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val hash = digest.digest(seed.toByteArray())
+    return hash.take(12).joinToString("") { "%02X".format(it) }
 }
 
 // Make sure iOS framework is packaged when building
