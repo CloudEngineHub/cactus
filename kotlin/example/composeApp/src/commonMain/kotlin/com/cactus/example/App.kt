@@ -41,8 +41,8 @@ fun App() {
     suspend fun downloadModel(): String? {
         return withContext(Dispatchers.Default) {
             try {
-                val modelUrl = "https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
-                val fileName = "SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+                val modelUrl = "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"
+                val fileName = "Qwen3-0.6B-Q8_0.gguf"
                 
                 addLog("Starting model download...")
                 
