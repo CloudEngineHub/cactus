@@ -107,6 +107,7 @@ fun App() {
                     val currentModelPath = modelPath
                     if (currentModelPath != null) {
                         addLog("Initializing Cactus...")
+                        scope.launch {
                         try {
                             addLog("Creating Cactus instance...")
                             val instance = Cactus()
@@ -128,6 +129,7 @@ fun App() {
                         } catch (e: Exception) {
                             addLog("✗ Error: ${e.message}")
                             addLog("Exception type: ${e::class.simpleName}")
+                            }
                         }
                     } else {
                         addLog("Please download the model first")
@@ -167,6 +169,7 @@ fun App() {
                 onClick = {
                     cactus?.let { c ->
                         addLog("Tokenizing text...")
+                        scope.launch {
                         try {
                             val result = c.tokenize("Hello, world!")
                             result?.let { r ->
@@ -175,6 +178,7 @@ fun App() {
                             }
                         } catch (e: Exception) {
                             addLog("✗ Error tokenizing: ${e.message}")
+                            }
                         }
                     } ?: run { addLog("Please initialize Cactus first") }
                 },
@@ -189,6 +193,7 @@ fun App() {
                 onClick = {
                     cactus?.let { c ->
                         addLog("Running benchmark...")
+                        scope.launch {
                         try {
                             val result = c.bench(pp = 512, tg = 128, pl = 1, nr = 1)
                             result?.let { r ->
@@ -198,6 +203,7 @@ fun App() {
                             }
                         } catch (e: Exception) {
                             addLog("✗ Error running benchmark: ${e.message}")
+                            }
                         }
                     } ?: run { addLog("Please initialize Cactus first") }
                 },
@@ -212,6 +218,7 @@ fun App() {
                 onClick = {
                     cactus?.let { c ->
                         addLog("Generating completion...")
+                        scope.launch {
                         try {
                             val params = CactusCompletionParams(
                                 prompt = "What is the capital of France?",
@@ -225,6 +232,7 @@ fun App() {
                             }
                         } catch (e: Exception) {
                             addLog("✗ Error generating completion: ${e.message}")
+                            }
                         }
                     } ?: run { addLog("Please initialize Cactus first") }
                 },

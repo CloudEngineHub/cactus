@@ -3,7 +3,7 @@ package com.cactus
 class Cactus {
     private var handle: CactusContextHandle? = null
     
-    fun initialize(params: CactusInitParams): Boolean {
+    suspend fun initialize(params: CactusInitParams): Boolean {
         return try {
             val contextHandle = CactusContext.initContext(params) ?: 0L
             if (contextHandle != 0L) {
@@ -24,7 +24,7 @@ class Cactus {
         }
     }
     
-    fun completion(params: CactusCompletionParams): CactusCompletionResult? {
+    suspend fun completion(params: CactusCompletionParams): CactusCompletionResult? {
         return handle?.let { h ->
             try {
                 CactusContext.completion(h, params)
@@ -34,7 +34,7 @@ class Cactus {
         }
     }
     
-    fun multimodalCompletion(params: CactusCompletionParams, mediaPaths: List<String>): CactusCompletionResult? {
+    suspend fun multimodalCompletion(params: CactusCompletionParams, mediaPaths: List<String>): CactusCompletionResult? {
         return handle?.let { h ->
             try {
                 CactusContext.multimodalCompletion(h, params, mediaPaths)
@@ -50,7 +50,7 @@ class Cactus {
         }
     }
     
-    fun tokenize(text: String): CactusTokenArray? {
+    suspend fun tokenize(text: String): CactusTokenArray? {
         return handle?.let { h ->
             try {
                 CactusContext.tokenize(h, text)
@@ -60,7 +60,7 @@ class Cactus {
         }
     }
     
-    fun detokenize(tokens: IntArray): String? {
+    suspend fun detokenize(tokens: IntArray): String? {
         return handle?.let { h ->
             try {
                 CactusContext.detokenize(h, tokens)
@@ -70,7 +70,7 @@ class Cactus {
         }
     }
     
-    fun embedding(text: String): CactusFloatArray? {
+    suspend fun embedding(text: String): CactusFloatArray? {
         return handle?.let { h ->
             try {
                 CactusContext.embedding(h, text)
@@ -80,7 +80,7 @@ class Cactus {
         }
     }
     
-    fun initMultimodal(mmprojPath: String, useGpu: Boolean = true): Boolean {
+    suspend fun initMultimodal(mmprojPath: String, useGpu: Boolean = true): Boolean {
         return handle?.let { h ->
             try {
                 CactusContext.initMultimodal(h, mmprojPath, useGpu) == 0
@@ -120,7 +120,7 @@ class Cactus {
         } ?: false
     }
     
-    fun initVocoder(vocoderModelPath: String): Boolean {
+    suspend fun initVocoder(vocoderModelPath: String): Boolean {
         return handle?.let { h ->
             try {
                 CactusContext.initVocoder(h, vocoderModelPath) == 0
@@ -140,7 +140,7 @@ class Cactus {
         } ?: false
     }
     
-    fun bench(pp: Int = 512, tg: Int = 128, pl: Int = 1, nr: Int = 1): CactusBenchResult? {
+    suspend fun bench(pp: Int = 512, tg: Int = 128, pl: Int = 1, nr: Int = 1): CactusBenchResult? {
         return handle?.let { h ->
             try {
                 CactusContext.bench(h, pp, tg, pl, nr)
@@ -150,7 +150,7 @@ class Cactus {
         }
     }
     
-    fun applyLoraAdapters(adapters: List<CactusLoraAdapter>): Boolean {
+    suspend fun applyLoraAdapters(adapters: List<CactusLoraAdapter>): Boolean {
         return handle?.let { h ->
             try {
                 CactusContext.applyLoraAdapters(h, adapters) == 0
@@ -186,7 +186,7 @@ class Cactus {
         } ?: false
     }
     
-    fun getFormattedChat(messages: String, chatTemplate: String? = null): String? {
+    suspend fun getFormattedChat(messages: String, chatTemplate: String? = null): String? {
         return handle?.let { h ->
             try {
                 CactusContext.getFormattedChat(h, messages, chatTemplate)
@@ -196,7 +196,7 @@ class Cactus {
         }
     }
     
-    fun getFormattedChatWithJinja(
+    suspend fun getFormattedChatWithJinja(
         messages: String, 
         chatTemplate: String? = null, 
         jsonSchema: String? = null, 

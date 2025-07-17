@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -11,9 +11,9 @@
 		058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */; };
 		2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2152FB032600AC8F00CF470E /* iOSApp.swift */; };
 		7555FF83242A565900829871 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7555FF82242A565900829871 /* ContentView.swift */; };
-		83F68B1A910B41068C6AB8DE /* cactus.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E540015DCB07D4DDB32D5ABB /* cactus.xcframework */; };
-		F6A9E8023B114D1D2AFB1FDB /* cactus.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = E540015DCB07D4DDB32D5ABB /* cactus.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		BA4C3EDC2E29A2A000445B97 /* cactus in Frameworks */ = {isa = PBXBuildFile; productRef = BA4C3EDB2E29A2A000445B97 /* cactus */; };
 /* End PBXBuildFile section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		258D668BD50082977ED7F4EA /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -21,23 +21,20 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				F6A9E8023B114D1D2AFB1FDB /* cactus.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
-
 /* Begin PBXFileReference section */
 		058557BA273AAA24004C7B11 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		2152FB032600AC8F00CF470E /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
-		7555FF7B242A565900829871 /* KMP App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "KMP App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7555FF7B242A565900829871 /* Cactus Example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cactus Example.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7555FF82242A565900829871 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB3632DC29227652001CCB65 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		E540015DCB07D4DDB32D5ABB /* cactus.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Frameworks/cactus.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,7 +42,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				83F68B1A910B41068C6AB8DE /* cactus.xcframework in Frameworks */,
+				BA4C3EDC2E29A2A000445B97 /* cactus in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,28 +57,19 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		42799AB246E5F90AF97AA0EF /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				E540015DCB07D4DDB32D5ABB /* cactus.xcframework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		7555FF72242A565900829871 = {
 			isa = PBXGroup;
 			children = (
 				AB1DB47929225F7C00F7AF9C /* Configuration */,
 				7555FF7D242A565900829871 /* iosApp */,
 				7555FF7C242A565900829871 /* Products */,
-				42799AB246E5F90AF97AA0EF /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
 		7555FF7C242A565900829871 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				7555FF7B242A565900829871 /* KMP App.app */,
+				7555FF7B242A565900829871 /* Cactus Example.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -117,7 +105,7 @@
 				7555FF77242A565900829871 /* Sources */,
 				B92378962B6B1156000C7307 /* Frameworks */,
 				7555FF79242A565900829871 /* Resources */,
-							258D668BD50082977ED7F4EA /* Embed Frameworks */,
+				258D668BD50082977ED7F4EA /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -125,9 +113,10 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
+				BA4C3EDB2E29A2A000445B97 /* cactus */,
 			);
 			productName = iosApp;
-			productReference = 7555FF7B242A565900829871 /* KMP App.app */;
+			productReference = 7555FF7B242A565900829871 /* Cactus Example.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -156,6 +145,7 @@
 			);
 			mainGroup = 7555FF72242A565900829871;
 			packageReferences = (
+				BA4C3EDA2E29A2A000445B97 /* XCLocalSwiftPackageReference "../../../../cactus" */,
 			);
 			productRefGroup = 7555FF7C242A565900829871 /* Products */;
 			projectDirPath = "";
@@ -410,6 +400,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		BA4C3EDA2E29A2A000445B97 /* XCLocalSwiftPackageReference "../../../../cactus" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../cactus;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BA4C3EDB2E29A2A000445B97 /* cactus */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = cactus;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7555FF73242A565900829871 /* Project object */;
 }

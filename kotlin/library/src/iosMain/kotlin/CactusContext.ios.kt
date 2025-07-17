@@ -3,10 +3,12 @@ package com.cactus
 
 import com.cactus.native.*
 import kotlinx.cinterop.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 actual object CactusContext {
-    actual fun initContext(params: CactusInitParams): CactusContextHandle? {
-        return memScoped {
+    actual suspend fun initContext(params: CactusInitParams): CactusContextHandle? = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cParams = cValue<cactus_init_params_c_t> {
                 model_path = params.modelPath.cstr.ptr
                 chat_template = params.chatTemplate?.cstr?.ptr
@@ -33,8 +35,8 @@ actual object CactusContext {
         cactus_free_context_c(handle.toCPointer())
     }
 
-    actual fun completion(handle: CactusContextHandle, params: CactusCompletionParams): CactusCompletionResult {
-        return memScoped {
+    actual suspend fun completion(handle: CactusContextHandle, params: CactusCompletionParams): CactusCompletionResult = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cParams = cValue<cactus_completion_params_c_t> {
                 prompt = params.prompt.cstr.ptr
                 n_predict = params.nPredict
@@ -78,8 +80,8 @@ actual object CactusContext {
         }
     }
 
-    actual fun multimodalCompletion(handle: CactusContextHandle, params: CactusCompletionParams, mediaPaths: List<String>): CactusCompletionResult {
-        return memScoped {
+    actual suspend fun multimodalCompletion(handle: CactusContextHandle, params: CactusCompletionParams, mediaPaths: List<String>): CactusCompletionResult = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cParams = cValue<cactus_completion_params_c_t> {
                 prompt = params.prompt.cstr.ptr
                 n_predict = params.nPredict
@@ -135,7 +137,7 @@ actual object CactusContext {
         cactus_stop_completion_c(handle.toCPointer())
     }
 
-    actual fun tokenize(handle: CactusContextHandle, text: String): CactusTokenArray {
+    actual suspend fun tokenize(handle: CactusContextHandle, text: String): CactusTokenArray = withContext(Dispatchers.Default) {
         val cResult = cactus_tokenize_c(handle.toCPointer(), text)
         val tokens = cResult.useContents {
             tokens?.readBytes(count * sizeOf<IntVar>().toInt())?.let { bytes ->
@@ -146,19 +148,19 @@ actual object CactusContext {
         }
         val count = cResult.useContents { count }
         cactus_free_token_array_c(cResult)
-        return CactusTokenArray(tokens, count)
+        return@withContext CactusTokenArray(tokens, count)
     }
 
-    actual fun detokenize(handle: CactusContextHandle, tokens: IntArray): String {
-        return memScoped {
+    actual suspend fun detokenize(handle: CactusContextHandle, tokens: IntArray): String = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cTokens = tokens.toCValues()
             val result = cactus_detokenize_c(handle.toCPointer(), cTokens, tokens.size)
             result?.toKString() ?: ""
         }
     }
 
-    actual fun tokenizeWithMedia(handle: CactusContextHandle, text: String, mediaPaths: List<String>): CactusTokenizeResult {
-        return memScoped {
+    actual suspend fun tokenizeWithMedia(handle: CactusContextHandle, text: String, mediaPaths: List<String>): CactusTokenizeResult = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cMediaPaths = mediaPaths.map { it.cstr.ptr }.toCValues()
             val cResult = cactus_tokenize_with_media_c(handle.toCPointer(), text, cMediaPaths, mediaPaths.size)
             
@@ -205,7 +207,7 @@ actual object CactusContext {
         }
     }
 
-    actual fun embedding(handle: CactusContextHandle, text: String): CactusFloatArray {
+    actual suspend fun embedding(handle: CactusContextHandle, text: String): CactusFloatArray = withContext(Dispatchers.Default) {
         val cResult = cactus_embedding_c(handle.toCPointer(), text)
         val values = cResult.useContents {
             values?.readBytes(count * sizeOf<FloatVar>().toInt())?.let { bytes ->
@@ -216,7 +218,7 @@ actual object CactusContext {
         }
         val count = cResult.useContents { count }
         cactus_free_float_array_c(cResult)
-        return CactusFloatArray(values, count)
+        CactusFloatArray(values, count)
     }
 
     actual fun setGuideTokens(handle: CactusContextHandle, tokens: IntArray) {
@@ -226,8 +228,8 @@ actual object CactusContext {
         }
     }
 
-    actual fun initMultimodal(handle: CactusContextHandle, mmprojPath: String, useGpu: Boolean): Int {
-        return cactus_init_multimodal_c(handle.toCPointer(), mmprojPath, useGpu)
+    actual suspend fun initMultimodal(handle: CactusContextHandle, mmprojPath: String, useGpu: Boolean): Int = withContext(Dispatchers.Default) {
+        return@withContext cactus_init_multimodal_c(handle.toCPointer(), mmprojPath, useGpu)
     }
 
     actual fun isMultimodalEnabled(handle: CactusContextHandle): Boolean {
@@ -246,8 +248,8 @@ actual object CactusContext {
         cactus_release_multimodal_c(handle.toCPointer())
     }
 
-    actual fun initVocoder(handle: CactusContextHandle, vocoderModelPath: String): Int {
-        return cactus_init_vocoder_c(handle.toCPointer(), vocoderModelPath)
+    actual suspend fun initVocoder(handle: CactusContextHandle, vocoderModelPath: String): Int = withContext(Dispatchers.Default) {
+        return@withContext cactus_init_vocoder_c(handle.toCPointer(), vocoderModelPath)
     }
 
     actual fun isVocoderEnabled(handle: CactusContextHandle): Boolean {
@@ -258,12 +260,12 @@ actual object CactusContext {
         return cactus_get_tts_type_c(handle.toCPointer())
     }
 
-    actual fun getFormattedAudioCompletion(handle: CactusContextHandle, speakerJson: String?, textToSpeak: String): String {
+    actual suspend fun getFormattedAudioCompletion(handle: CactusContextHandle, speakerJson: String?, textToSpeak: String): String = withContext(Dispatchers.Default) {
         val result = cactus_get_formatted_audio_completion_c(handle.toCPointer(), speakerJson, textToSpeak)
-        return result?.toKString()?.also { cactus_free_string_c(result) } ?: ""
+        return@withContext result?.toKString()?.also { cactus_free_string_c(result) } ?: ""
     }
 
-    actual fun getAudioGuideTokens(handle: CactusContextHandle, textToSpeak: String): CactusTokenArray {
+    actual suspend fun getAudioGuideTokens(handle: CactusContextHandle, textToSpeak: String): CactusTokenArray = withContext(Dispatchers.Default) {
         val cResult = cactus_get_audio_guide_tokens_c(handle.toCPointer(), textToSpeak)
         val tokens = cResult.useContents {
             tokens?.readBytes(count * sizeOf<IntVar>().toInt())?.let { bytes ->
@@ -272,11 +274,11 @@ actual object CactusContext {
         }
         val count = cResult.useContents { count }
         cactus_free_token_array_c(cResult)
-        return CactusTokenArray(tokens, count)
+        return@withContext CactusTokenArray(tokens, count)
     }
 
-    actual fun decodeAudioTokens(handle: CactusContextHandle, tokens: IntArray): CactusFloatArray {
-        return memScoped {
+    actual suspend fun decodeAudioTokens(handle: CactusContextHandle, tokens: IntArray): CactusFloatArray = withContext(Dispatchers.Default) {
+        memScoped {
             val cTokens = tokens.toCValues()
             val cResult = cactus_decode_audio_tokens_c(handle.toCPointer(), cTokens, tokens.size)
             val values = cResult.useContents {
@@ -294,8 +296,8 @@ actual object CactusContext {
         cactus_release_vocoder_c(handle.toCPointer())
     }
 
-    actual fun bench(handle: CactusContextHandle, pp: Int, tg: Int, pl: Int, nr: Int): CactusBenchResult {
-        return memScoped {
+    actual suspend fun bench(handle: CactusContextHandle, pp: Int, tg: Int, pl: Int, nr: Int): CactusBenchResult = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cResult = cactus_bench_c(handle.toCPointer(), pp, tg, pl, nr)
             val result = cResult.useContents {
                 CactusBenchResult(
@@ -314,8 +316,8 @@ actual object CactusContext {
         }
     }
 
-    actual fun applyLoraAdapters(handle: CactusContextHandle, adapters: List<CactusLoraAdapter>): Int {
-        return memScoped {
+    actual suspend fun applyLoraAdapters(handle: CactusContextHandle, adapters: List<CactusLoraAdapter>): Int = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cAdapters = allocArray<cactus_lora_adapter_c_t>(adapters.size)
             adapters.forEachIndexed { index, adapter ->
                 cAdapters[index].path = adapter.path.cstr.ptr
@@ -357,13 +359,13 @@ actual object CactusContext {
         return cactus_validate_chat_template_c(handle.toCPointer(), useJinja, name)
     }
 
-    actual fun getFormattedChat(handle: CactusContextHandle, messages: String, chatTemplate: String?): String {
+    actual suspend fun getFormattedChat(handle: CactusContextHandle, messages: String, chatTemplate: String?): String = withContext(Dispatchers.Default) {
         val result = cactus_get_formatted_chat_c(handle.toCPointer(), messages, chatTemplate)
-        return result?.toKString()?.also { cactus_free_string_c(result) } ?: ""
+        return@withContext result?.toKString()?.also { cactus_free_string_c(result) } ?: ""
     }
 
-    actual fun getFormattedChatWithJinja(handle: CactusContextHandle, messages: String, chatTemplate: String?, jsonSchema: String?, tools: String?, parallelToolCalls: Boolean, toolChoice: String?): CactusChatResult {
-        return memScoped {
+    actual suspend fun getFormattedChatWithJinja(handle: CactusContextHandle, messages: String, chatTemplate: String?, jsonSchema: String?, tools: String?, parallelToolCalls: Boolean, toolChoice: String?): CactusChatResult = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val cResult = cactus_get_formatted_chat_with_jinja_c(
                 handle.toCPointer(),
                 messages,
@@ -415,8 +417,8 @@ actual object CactusContext {
         }
     }
 
-    actual fun doCompletionStep(handle: CactusContextHandle): Pair<Int, String> {
-        return memScoped {
+    actual suspend fun doCompletionStep(handle: CactusContextHandle): Pair<Int, String> = withContext(Dispatchers.Default) {
+        return@withContext memScoped {
             val tokenTextRef = alloc<CPointerVar<ByteVar>>()
             val tokenId = cactus_do_completion_step_c(handle.toCPointer(), tokenTextRef.ptr)
             val tokenText = tokenTextRef.value?.toKString() ?: ""
