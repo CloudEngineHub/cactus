@@ -61,7 +61,8 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation("net.java.dev.jna:jna:5.13.0")
+                // Use the AAR artifact so that JNA's native .so files are bundled in the APK
+                implementation("net.java.dev.jna:jna:5.13.0@aar")
             }
         }
     }
@@ -123,7 +124,7 @@ android {
     }
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs("libs/android/jniLibs")
+            jniLibs.srcDirs("src/commonMain/resources/android/jniLibs")
         }
     }
 }
