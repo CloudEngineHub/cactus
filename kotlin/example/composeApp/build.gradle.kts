@@ -30,8 +30,9 @@ kotlin {
 
     sourceSets {
                 androidMain.dependencies {
-            implementation(libs.androidx.compose.ui.tooling.preview)
+            implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation("androidx.compose.ui:ui-tooling-preview:1.5.4")
             implementation(libs.ktor.client.okhttp)
 
         }
@@ -45,7 +46,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-            implementation("com.cactus:library:0.2.0")
+            implementation("com.cactus:library:0.2.1")
             implementation(libs.ktor.client.core)
         }
     }

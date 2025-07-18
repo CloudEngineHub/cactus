@@ -269,5 +269,62 @@ class Cactus {
         } ?: 0L
     }
     
+    // Speech Recognition functionality
+    suspend fun initializeSpeechRecognition(): Boolean {
+        return try {
+            com.cactus.initializeSpeechRecognition()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    suspend fun requestSpeechPermissions(): Boolean {
+        return try {
+            com.cactus.requestSpeechPermissions()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    suspend fun speechToText(params: SpeechRecognitionParams = SpeechRecognitionParams()): SpeechRecognitionResult? {
+        return try {
+            com.cactus.performSpeechRecognition(params)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    suspend fun speechToTextFromFile(audioFilePath: String, params: SpeechRecognitionParams = SpeechRecognitionParams()): SpeechRecognitionResult? {
+        return try {
+            com.cactus.recognizeSpeechFromFile(audioFilePath, params)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    fun stopSpeechRecognition() {
+        try {
+            com.cactus.stopSpeechRecognition()
+        } catch (e: Exception) {
+            // Ignore errors when stopping
+        }
+    }
+    
+    fun isSpeechRecognitionAvailable(): Boolean {
+        return try {
+            com.cactus.isSpeechRecognitionAvailable()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    fun isSpeechRecognitionAuthorized(): Boolean {
+        return try {
+            com.cactus.isSpeechRecognitionAuthorized()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
     fun isInitialized(): Boolean = handle != null
 } 

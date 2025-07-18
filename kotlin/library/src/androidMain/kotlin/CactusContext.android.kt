@@ -273,7 +273,7 @@ actual object CactusContext {
             n_probs = params.nProbs
             stop_sequences = Pointer.NULL
             stop_sequence_count = 0
-            grammar = params.grammar
+            grammar = if (params.grammar.isNullOrEmpty()) null else params.grammar
             token_callback = null
         }
 
@@ -319,7 +319,7 @@ actual object CactusContext {
             n_probs = params.nProbs
             stop_sequences = Pointer.NULL
             stop_sequence_count = 0
-            grammar = params.grammar
+            grammar = if (params.grammar.isNullOrEmpty()) null else params.grammar
             token_callback = null
         }
         val result = CactusCompletionResultC()

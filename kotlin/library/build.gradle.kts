@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.cactus"
-version = "0.2.0"
+version = "0.2.1"
 
 kotlin {
     androidTarget {
@@ -64,6 +64,8 @@ kotlin {
             dependencies {
                 // Use the AAR artifact so that JNA's native .so files are bundled in the APK
                 implementation("net.java.dev.jna:jna:5.13.0@aar")
+                implementation("androidx.core:core-ktx:1.12.0")
+                implementation("androidx.activity:activity-compose:1.8.2")
             }
         }
     }

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
+import com.cactus.initializeAndroidSpeechContext
 
 class MainActivity : ComponentActivity() {
     
@@ -30,6 +31,9 @@ class MainActivity : ComponentActivity() {
         
         // Initialize Android context for model file handling
         initializeAndroidContext(this)
+        
+        // Initialize Android context for speech recognition
+        initializeAndroidSpeechContext(this)
         
         enableEdgeToEdge()
         setContent {
