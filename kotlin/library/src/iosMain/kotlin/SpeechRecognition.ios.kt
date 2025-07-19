@@ -18,6 +18,8 @@ private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest? = null
 private var recognitionTask: SFSpeechRecognitionTask? = null
 private var isInitialized = false
 private var isRecording = false
+private var lastSpeechTime: Double = 0.0
+private var hasDetectedSpeech = false
 
 @OptIn(ExperimentalForeignApi::class)
 actual suspend fun initializeSpeechRecognition(): Boolean = withContext(Dispatchers.Main) {
@@ -73,7 +75,7 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
             request.requiresOnDeviceRecognition = true
         }
         
-        request.shouldReportPartialResults = params.enablePartialResults
+        request.shouldReportPartialResults = true
         
         val inputNode = audioEngine!!.inputNode
         val recordingFormat = inputNode.outputFormatForBus(0u)
@@ -89,9 +91,16 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
         audioEngine!!.prepare()
         audioEngine!!.startAndReturnError(null)
         isRecording = true
+        hasDetectedSpeech = false
+        lastSpeechTime = NSDate().timeIntervalSince1970
         
         var hasFinalResult = false
         var timeoutTimer: NSTimer? = null
+        var silenceTimer: NSTimer? = null
+        var lastTranscriptionLength = 0
+        var currentText = ""
+        
+        println("🎙️ Started listening... (speak now)")
         
         recognitionTask = speechRecognizer!!.recognitionTaskWithRequest(request) { result, error ->
             
@@ -101,18 +110,55 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
                     stopCurrentRecognition()
                     continuation.resume(null)
                     timeoutTimer?.invalidate()
+                    silenceTimer?.invalidate()
                 }
                 return@recognitionTaskWithRequest
             }
             
             if (result != null) {
                 val text = result.bestTranscription.formattedString
+                currentText = text // Update current text
                 val confidence = 0.9f
+                val currentTime = NSDate().timeIntervalSince1970
+                
+        
+                if (text.length > lastTranscriptionLength && text.trim().isNotEmpty()) {
+                    hasDetectedSpeech = true
+                    lastSpeechTime = currentTime
+                    lastTranscriptionLength = text.length
+                    println("Speech detected: '$text'")
+                    
+                    silenceTimer?.invalidate()
+                    
+                    if (hasDetectedSpeech) {
+                        silenceTimer = NSTimer.scheduledTimerWithTimeInterval(
+                            interval = 1.0, 
+                            repeats = false
+                        ) { _ ->
+                            if (!hasFinalResult && hasDetectedSpeech) {
+                                println("Silence detected, stopping...")
+                                hasFinalResult = true
+                                stopCurrentRecognition()
+                                timeoutTimer?.invalidate()
+                                
+                                val speechResult = SpeechRecognitionResult(
+                                    text = currentText,
+                                    confidence = confidence,
+                                    isPartial = false,
+                                    alternatives = emptyList()
+                                )
+                                println("Resuming with silence-detected result: $speechResult")
+                                continuation.resume(speechResult)
+                            }
+                        }
+                    }
+                }
                 
                 if (result.isFinal()) {
                     hasFinalResult = true
                     stopCurrentRecognition()
                     timeoutTimer?.invalidate()
+                    silenceTimer?.invalidate()
                     
                     val speechResult = SpeechRecognitionResult(
                         text = text,
@@ -120,36 +166,69 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
                         isPartial = false,
                         alternatives = emptyList()
                     )
+                    println("🔄 Resuming with final result: $speechResult")
                     continuation.resume(speechResult)
-                } else if (params.enablePartialResults && text.isNotEmpty()) {
-                    val speechResult = SpeechRecognitionResult(
-                        text = text,
-                        confidence = confidence,
-                        isPartial = true,
-                        alternatives = emptyList()
-                    )
                 }
             }
         }
         
+        // Overall timeout timer
         timeoutTimer = NSTimer.scheduledTimerWithTimeInterval(
             interval = params.maxDuration.toDouble(),
             repeats = false
         ) { _ ->
             if (!hasFinalResult) {
-                println("Speech recognition timeout")
+                if (hasDetectedSpeech) {
+                    println("Timeout reached, finishing with detected speech")
+                    stopCurrentRecognition()
+                    silenceTimer?.invalidate()
+                    val timeoutResult = SpeechRecognitionResult(
+                        text = currentText,
+                        confidence = 0.8f,
+                        isPartial = false,
+                        alternatives = emptyList()
+                    )
+                    println("Resuming with timeout result (with speech): $timeoutResult")
+                    continuation.resume(timeoutResult)
+                } else {
+                    println("Timeout reached, no speech detected")
+                    stopCurrentRecognition()
+                    silenceTimer?.invalidate()
+                    val noSpeechResult = SpeechRecognitionResult(
+                        text = "",
+                        confidence = 0.0f,
+                        isPartial = false,
+                        alternatives = emptyList()
+                    )
+                    println("Resuming with timeout result (no speech): $noSpeechResult")
+                    continuation.resume(noSpeechResult)
+                }
+            }
+        }
+        
+        silenceTimer = NSTimer.scheduledTimerWithTimeInterval(
+            interval = 5.0, 
+            repeats = false
+        ) { _ ->
+            if (!hasFinalResult && !hasDetectedSpeech) {
+                println("No speech detected in 5 seconds, stopping...")
+                hasFinalResult = true
                 stopCurrentRecognition()
-                continuation.resume(SpeechRecognitionResult(
+                timeoutTimer?.invalidate()
+                val initialSilenceResult = SpeechRecognitionResult(
                     text = "",
                     confidence = 0.0f,
                     isPartial = false,
                     alternatives = emptyList()
-                ))
+                )
+                println("Resuming with initial silence result: $initialSilenceResult")
+                continuation.resume(initialSilenceResult)
             }
         }
         
         continuation.invokeOnCancellation {
             timeoutTimer?.invalidate()
+            silenceTimer?.invalidate()
             stopCurrentRecognition()
         }
         
@@ -207,6 +286,7 @@ actual suspend fun recognizeSpeechFromFile(audioFilePath: String, params: Speech
 @OptIn(ExperimentalForeignApi::class)
 private fun stopCurrentRecognition() {
     if (isRecording) {
+        println("Stopping speech recognition...")
         audioEngine?.stop()
         audioEngine?.inputNode?.removeTapOnBus(0u)
         isRecording = false
@@ -216,6 +296,7 @@ private fun stopCurrentRecognition() {
     recognitionRequest = null
     recognitionTask?.cancel()
     recognitionTask = null
+    hasDetectedSpeech = false
 }
 
 actual fun stopSpeechRecognition() {

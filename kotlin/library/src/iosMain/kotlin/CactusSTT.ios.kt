@@ -49,12 +49,16 @@ actual suspend fun initializeSTT(): Boolean {
 
 actual suspend fun performSTT(language: String, maxDuration: Int): STTResult? {
     return try {
+        println("iOS performSTT called with language=$language, maxDuration=$maxDuration")
+        
         if (!isSpeechRecognitionAuthorized()) {
+            println("Requesting speech permissions...")
             val permissionGranted = requestSpeechPermissions()
             if (!permissionGranted) {
                 println("Speech recognition permission not granted")
                 return null
             }
+            println("Speech recognition permission granted")
         }
         
         if (!isSpeechRecognitionAvailable()) {
@@ -62,21 +66,35 @@ actual suspend fun performSTT(language: String, maxDuration: Int): STTResult? {
             return null
         }
         
+        println("Creating speech recognition params...")
         val params = SpeechRecognitionParams(
             language = language,
             enablePartialResults = false,
             maxDuration = maxDuration
         )
+        
+        println("Calling performSpeechRecognition...")
         val speechResult = performSpeechRecognition(params)
-        speechResult?.let {
-            STTResult(
-                text = it.text,
-                confidence = it.confidence,
-                isPartial = it.isPartial
-            )
+        
+        println("performSpeechRecognition returned: $speechResult")
+        
+        if (speechResult == null) {
+            println("❌ speechResult is null")
+            return null
         }
+        
+        println("📱 Converting to STTResult - text: '${speechResult.text}', confidence: ${speechResult.confidence}")
+        val result = STTResult(
+            text = speechResult.text,
+            confidence = speechResult.confidence,
+            isPartial = speechResult.isPartial
+        )
+        
+        println("Returning STTResult: $result")
+        result
     } catch (e: Exception) {
         println("STT error: $e")
+        e.printStackTrace()
         null
     }
 }
