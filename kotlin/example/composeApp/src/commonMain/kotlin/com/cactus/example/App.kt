@@ -76,7 +76,7 @@ fun App() {
                                 onClick = {
                                     scope.launch {
                                         addLog("Loading LM model...")
-                                        val success = lm.load("Qwen3-0.6B-Q8_0.gguf")
+                                        val success = lm.init()
                                         addLog(if (success) "LM model loaded" else "LM load failed")
                                     }
                                 }
@@ -118,7 +118,7 @@ fun App() {
                                 onClick = {
                                     scope.launch {
                                         addLog("Loading VLM model...")
-                                        val success = vlm.load("SmolVLM2-500M-Video-Instruct-Q8_0.gguf")
+                                        val success = vlm.init()
                                         addLog(if (success) "VLM model loaded" else "VLM load failed")
                                     }
                                 }
@@ -153,7 +153,7 @@ fun App() {
                                         val downloadSuccess = stt.download()
                                         if (downloadSuccess) {
                                             addLog("Initializing STT...")
-                                            val initSuccess = stt.initialize()
+                                            val initSuccess = stt.init()
                                             addLog(if (initSuccess) "STT ready" else "STT init failed")
                                         } else {
                                             addLog("STT download failed")
@@ -169,7 +169,7 @@ fun App() {
                                             addLog("Setting up STT first...")
                                             val downloadSuccess = stt.download()
                                             if (downloadSuccess) {
-                                                val initSuccess = stt.initialize()
+                                                val initSuccess = stt.init()
                                                 if (!initSuccess) {
                                                     addLog("STT initialization failed")
                                                     return@launch

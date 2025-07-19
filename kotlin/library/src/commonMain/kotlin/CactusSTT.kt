@@ -12,13 +12,21 @@ class CactusSTT(
     private val maxDuration: Int = 30
 ) {
     private var isInitialized = false
+    private var lastDownloadedFilename: String? = null
     
-    suspend fun download(url: String = "https://huggingface.co/Cactus-Compute/vosk-small-en-0.15/resolve/main/vosk-model-small-en-us-0.15.zip"): Boolean {
-        val filename = url.substringAfterLast("/")
-        return downloadSTTModel(url, filename)
+    suspend fun download(
+        url: String = "https://huggingface.co/Cactus-Compute/vosk-small-en-0.15/resolve/main/vosk-model-small-en-us-0.15.zip",
+        filename: String? = null
+    ): Boolean {
+        val actualFilename = filename ?: url.substringAfterLast("/")
+        val success = downloadSTTModel(url, actualFilename)
+        if (success) {
+            lastDownloadedFilename = actualFilename
+        }
+        return success
     }
     
-    suspend fun initialize(): Boolean {
+    suspend fun init(filename: String? = lastDownloadedFilename): Boolean {
         isInitialized = initializeSTT()
         return isInitialized
     }

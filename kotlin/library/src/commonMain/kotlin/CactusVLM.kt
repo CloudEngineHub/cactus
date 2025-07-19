@@ -6,26 +6,36 @@ class CactusVLM(
     private val batchSize: Int = 512
 ) {
     private var handle: Long? = null
+    private var lastDownloadedModelFilename: String? = null
+    private var lastDownloadedMmprojFilename: String? = null
     
     suspend fun download(
         modelUrl: String = "https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
-        mmprojUrl: String = "https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+        mmprojUrl: String = "https://huggingface.co/Cactus-Compute/SmolVLM2-500m-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+        modelFilename: String? = null,
+        mmprojFilename: String? = null
     ): Boolean {
-        val modelFilename = modelUrl.substringAfterLast("/")
-        val mmprojFilename = mmprojUrl.substringAfterLast("/")
+        val actualModelFilename = modelFilename ?: modelUrl.substringAfterLast("/")
+        val actualMmprojFilename = mmprojFilename ?: mmprojUrl.substringAfterLast("/")
         
-        val modelSuccess = downloadVLMModel(modelUrl, modelFilename)
-        val mmprojSuccess = downloadVLMModel(mmprojUrl, mmprojFilename)
+        val modelSuccess = downloadVLMModel(modelUrl, actualModelFilename)
+        val mmprojSuccess = downloadVLMModel(mmprojUrl, actualMmprojFilename)
+        
+        if (modelSuccess && mmprojSuccess) {
+            lastDownloadedModelFilename = actualModelFilename
+            lastDownloadedMmprojFilename = actualMmprojFilename
+        }
         
         return modelSuccess && mmprojSuccess
     }
     
-    suspend fun load(
-        modelPath: String, 
-        mmprojPath: String? = null
+    suspend fun init(
+        modelFilename: String? = lastDownloadedModelFilename ?: "SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+        mmprojFilename: String? = lastDownloadedMmprojFilename
     ): Boolean {
-        val actualMmprojPath = mmprojPath ?: modelPath.replace(".gguf", "-mmproj.gguf")
-        handle = loadVLMModel(modelPath, actualMmprojPath, threads, contextSize, batchSize)
+        val actualModelFilename = modelFilename ?: "SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+        val actualMmprojFilename = mmprojFilename ?: "mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+        handle = loadVLMModel(actualModelFilename, actualMmprojFilename, threads, contextSize, batchSize)
         return handle != null
     }
     

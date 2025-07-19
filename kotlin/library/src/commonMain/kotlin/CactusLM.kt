@@ -6,14 +6,22 @@ class CactusLM(
     private val batchSize: Int = 512
 ) {
     private var handle: Long? = null
+    private var lastDownloadedFilename: String? = null
     
-    suspend fun download(url: String = "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"): Boolean {
-        val filename = url.substringAfterLast("/")
-        return downloadModel(url, filename)
+    suspend fun download(
+        url: String = "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
+        filename: String? = null
+    ): Boolean {
+        val actualFilename = filename ?: url.substringAfterLast("/")
+        val success = downloadModel(url, actualFilename)
+        if (success) {
+            lastDownloadedFilename = actualFilename
+        }
+        return success
     }
     
-    suspend fun load(modelPath: String): Boolean {
-        handle = loadModel(modelPath, threads, contextSize, batchSize)
+    suspend fun init(filename: String = lastDownloadedFilename ?: "Qwen3-0.6B-Q8_0.gguf"): Boolean {
+        handle = loadModel(filename, threads, contextSize, batchSize)
         return handle != null
     }
     
