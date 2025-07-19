@@ -10,7 +10,7 @@ echo "Building Cactus Kotlin Multiplatform Library"
 cd "$ROOT_DIR/kotlin"
 
 echo "Cleaning previous builds..."
-./gradlew clean --no-configuration-cache
+./gradlew clean --no-daemon --no-configuration-cache
 
 echo "Copying native dependencies..."
 
@@ -35,10 +35,10 @@ else
 fi
 
 echo "Building KMP library..."
-./gradlew build --no-configuration-cache
+./gradlew build --no-daemon --no-configuration-cache
 
 echo "Publishing to Maven Local (triggers release XCFramework build with embedded C++)..."
-./gradlew publishToMavenLocal --no-configuration-cache
+./gradlew publishToMavenLocal --no-daemon --no-configuration-cache
 
 echo "Updating Package.swift to point to release XCFramework..."
 cd "$ROOT_DIR"

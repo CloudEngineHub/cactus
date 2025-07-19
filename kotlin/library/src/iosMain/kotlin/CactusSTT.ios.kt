@@ -66,7 +66,16 @@ actual suspend fun performSTT(language: String, maxDuration: Int): STTResult? {
             return null
         }
         
-        println("Creating speech recognition params...")
+        if (!isOnDeviceRecognitionAvailable()) {
+            println("On-device speech recognition not supported on this device")
+            return STTResult(
+                text = "",
+                confidence = 0.0f,
+                isPartial = false
+            )
+        }
+        
+        println("Creating speech recognition params (on-device mode)...")
         val params = SpeechRecognitionParams(
             language = language,
             enablePartialResults = false,

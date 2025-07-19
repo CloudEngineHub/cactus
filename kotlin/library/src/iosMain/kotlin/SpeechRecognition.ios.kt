@@ -31,7 +31,15 @@ actual suspend fun initializeSpeechRecognition(): Boolean = withContext(Dispatch
         audioSession.setCategory(AVAudioSessionCategoryRecord, null)
         audioSession.setActive(true, null)
         
-        isInitialized = speechRecognizer?.isAvailable() ?: false
+        val isAvailable = speechRecognizer?.isAvailable() ?: false
+        val supportsOnDevice = speechRecognizer?.supportsOnDeviceRecognition() ?: false
+        
+        if (!supportsOnDevice) {
+            println("On-device speech recognition not supported on this device")
+        }
+        
+        isInitialized = isAvailable
+        println("Speech recognition initialized - Available: $isAvailable, On-device: $supportsOnDevice")
         isInitialized
     } catch (e: Exception) {
         println("Failed to initialize speech recognition: $e")
@@ -62,6 +70,18 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
         return@suspendCancellableCoroutine
     }
     
+    val supportsOnDevice = speechRecognizer?.supportsOnDeviceRecognition() ?: false
+    if (!supportsOnDevice) {
+        println("On-device speech recognition not available - device too old or language not supported")
+        continuation.resume(SpeechRecognitionResult(
+            text = "",
+            confidence = 0.0f,
+            isPartial = false,
+            alternatives = emptyList()
+        ))
+        return@suspendCancellableCoroutine
+    }
+    
     try {
         stopCurrentRecognition()
         
@@ -71,11 +91,10 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
             return@suspendCancellableCoroutine
         }
         
-        if (speechRecognizer?.supportsOnDeviceRecognition() == true) {
-            request.requiresOnDeviceRecognition = true
-        }
-        
+        request.requiresOnDeviceRecognition = true
         request.shouldReportPartialResults = true
+        
+        println("Starting on-device speech recognition")
         
         val inputNode = audioEngine!!.inputNode
         val recordingFormat = inputNode.outputFormatForBus(0u)
@@ -247,16 +266,27 @@ actual suspend fun recognizeSpeechFromFile(audioFilePath: String, params: Speech
         continuation.resume(null)
         return@suspendCancellableCoroutine
     }
+    
+    val supportsOnDevice = speechRecognizer?.supportsOnDeviceRecognition() ?: false
+    if (!supportsOnDevice) {
+        println("On-device speech recognition not available for file processing")
+        continuation.resume(SpeechRecognitionResult(
+            text = "",
+            confidence = 0.0f,
+            isPartial = false,
+            alternatives = emptyList()
+        ))
+        return@suspendCancellableCoroutine
+    }
         
     try {
         val fileURL = NSURL.fileURLWithPath(audioFilePath)
         val request = SFSpeechURLRecognitionRequest(fileURL)
         
-        if (speechRecognizer?.supportsOnDeviceRecognition() == true) {
-            request.requiresOnDeviceRecognition = true
-        }
-        
+        request.requiresOnDeviceRecognition = true
         request.shouldReportPartialResults = false
+        
+        println("Starting on-device file speech recognition")
 
         speechRecognizer?.recognitionTaskWithRequest(request) { result, error ->
             if (error != null) {
@@ -309,4 +339,8 @@ actual fun isSpeechRecognitionAvailable(): Boolean {
 
 actual fun isSpeechRecognitionAuthorized(): Boolean {
     return SFSpeechRecognizer.authorizationStatus() == SFSpeechRecognizerAuthorizationStatus.SFSpeechRecognizerAuthorizationStatusAuthorized
+}
+
+fun isOnDeviceRecognitionAvailable(): Boolean {
+    return speechRecognizer?.supportsOnDeviceRecognition() ?: false
 } 
