@@ -66,6 +66,8 @@ kotlin {
                 implementation("net.java.dev.jna:jna:5.13.0@aar")
                 implementation("androidx.core:core-ktx:1.12.0")
                 implementation("androidx.activity:activity-compose:1.8.2")
+                // VOSK offline speech recognition
+                implementation("com.alphacephei:vosk-android:0.3.47@aar")
             }
         }
     }

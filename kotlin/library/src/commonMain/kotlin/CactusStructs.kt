@@ -119,7 +119,7 @@ data class CactusChatResult(
     val tools: String?,
     val toolChoice: String?,
     val parallelToolCalls: Boolean
-)
+) 
 
 data class SpeechRecognitionParams(
     val language: String = "en-US",
