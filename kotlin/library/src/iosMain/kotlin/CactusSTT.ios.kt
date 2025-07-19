@@ -33,11 +33,35 @@ actual suspend fun downloadSTTModel(url: String, filename: String): Boolean {
 }
 
 actual suspend fun initializeSTT(): Boolean {
-    return initializeSpeechRecognition()
+    return try {
+        val initialized = initializeSpeechRecognition()
+        if (initialized) {
+            println("iOS Speech recognition initialized successfully")
+        } else {
+            println("Failed to initialize iOS speech recognition")
+        }
+        initialized
+    } catch (e: Exception) {
+        println("Error initializing iOS speech recognition: $e")
+        false
+    }
 }
 
 actual suspend fun performSTT(language: String, maxDuration: Int): STTResult? {
     return try {
+        if (!isSpeechRecognitionAuthorized()) {
+            val permissionGranted = requestSpeechPermissions()
+            if (!permissionGranted) {
+                println("Speech recognition permission not granted")
+                return null
+            }
+        }
+        
+        if (!isSpeechRecognitionAvailable()) {
+            println("Speech recognition not available")
+            return null
+        }
+        
         val params = SpeechRecognitionParams(
             language = language,
             enablePartialResults = false,
@@ -52,6 +76,7 @@ actual suspend fun performSTT(language: String, maxDuration: Int): STTResult? {
             )
         }
     } catch (e: Exception) {
+        println("STT error: $e")
         null
     }
 }
