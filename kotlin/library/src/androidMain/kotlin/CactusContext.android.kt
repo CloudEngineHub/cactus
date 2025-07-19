@@ -184,7 +184,7 @@ internal interface CactusLibrary : Library {
     fun cactus_release_multimodal_c(handle: Pointer)
     fun cactus_init_vocoder_c(handle: Pointer, vocoderModelPath: String): Int
     fun cactus_is_vocoder_enabled_c(handle: Pointer): Boolean
-    fun cactus_get_tts_type_c(handle: Pointer): Int
+    
     fun cactus_get_formatted_audio_completion_c(handle: Pointer, speakerJson: String?, textToSpeak: String): String
     fun cactus_get_audio_guide_tokens_c(handle: Pointer, textToSpeak: String): CactusTokenArrayC.ByValue
     fun cactus_decode_audio_tokens_c(handle: Pointer, tokens: IntArray, count: Int): CactusFloatArrayC.ByValue
@@ -433,9 +433,7 @@ actual object CactusContext {
         return lib.cactus_is_vocoder_enabled_c(Pointer(handle))
     }
     
-    actual fun getTTSType(handle: CactusContextHandle): Int {
-        return lib.cactus_get_tts_type_c(Pointer(handle))
-    }
+    
     
     actual suspend fun getFormattedAudioCompletion(handle: CactusContextHandle, speakerJson: String?, textToSpeak: String): String = withContext(Dispatchers.Default) {
         return@withContext lib.cactus_get_formatted_audio_completion_c(Pointer(handle), speakerJson, textToSpeak)

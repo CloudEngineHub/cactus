@@ -256,9 +256,7 @@ actual object CactusContext {
         return cactus_is_vocoder_enabled_c(handle.toCPointer())
     }
 
-    actual fun getTTSType(handle: CactusContextHandle): Int {
-        return cactus_get_tts_type_c(handle.toCPointer())
-    }
+    
 
     actual suspend fun getFormattedAudioCompletion(handle: CactusContextHandle, speakerJson: String?, textToSpeak: String): String = withContext(Dispatchers.Default) {
         val result = cactus_get_formatted_audio_completion_c(handle.toCPointer(), speakerJson, textToSpeak)

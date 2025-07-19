@@ -20,7 +20,7 @@ expect object CactusContext {
     fun releaseMultimodal(handle: CactusContextHandle)
     suspend fun initVocoder(handle: CactusContextHandle, vocoderModelPath: String): Int
     fun isVocoderEnabled(handle: CactusContextHandle): Boolean
-    fun getTTSType(handle: CactusContextHandle): Int
+    
     suspend fun getFormattedAudioCompletion(handle: CactusContextHandle, speakerJson: String?, textToSpeak: String): String
     suspend fun getAudioGuideTokens(handle: CactusContextHandle, textToSpeak: String): CactusTokenArray
     suspend fun decodeAudioTokens(handle: CactusContextHandle, tokens: IntArray): CactusFloatArray

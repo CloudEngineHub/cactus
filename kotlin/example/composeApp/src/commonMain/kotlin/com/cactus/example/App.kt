@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import com.cactus.CactusLM
 import com.cactus.CactusVLM
 import com.cactus.CactusSTT
-import com.cactus.CactusTTS
+
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -23,7 +23,6 @@ fun App() {
     val lm = remember { CactusLM() }
     val vlm = remember { CactusVLM() }
     val stt = remember { CactusSTT() }
-    val tts = remember { CactusTTS() }
     
     var logs by remember { mutableStateOf(listOf<String>()) }
     
@@ -191,42 +190,7 @@ fun App() {
                     }
                 }
                 
-                // Text to Speech Section
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Text to Speech", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        addLog("Setting up TTS...")
-                                        val downloadSuccess = tts.download("https://example.com/tts.gguf")
-                                        if (downloadSuccess) {
-                                            val initSuccess = tts.initialize()
-                                            addLog(if (initSuccess) "TTS ready" else "TTS init failed")
-                                        } else {
-                                            addLog("TTS download failed")
-                                        }
-                                    }
-                                }
-                            ) { Text("Setup") }
-                            
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        addLog("Speaking...")
-                                        val success = tts.speak("Hello from Cactus TTS")
-                                        addLog(if (success) "TTS completed" else "TTS failed")
-                                    }
-                                }
-                            ) { Text("Speak") }
-                        }
-                    }
-                }
+
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider()
