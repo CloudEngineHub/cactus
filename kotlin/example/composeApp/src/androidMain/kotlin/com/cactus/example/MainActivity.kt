@@ -1,46 +1,45 @@
 package com.cactus.example
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.LaunchedEffect
-import com.cactus.initializeAndroidSpeechContext
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.ContextCompat
+import com.cactus.CactusContextInitializer
 
 class MainActivity : ComponentActivity() {
-    
-    companion object {
-        init {
-            try {
-                // Configure JNA for Android
-                System.setProperty("jna.nosys", "true")
-                System.setProperty("jna.noclasspath", "true")
-                
-                // Load the native library
-                System.loadLibrary("cactus")
-                println("Native library loaded successfully")
-            } catch (e: UnsatisfiedLinkError) {
-                println("Failed to load native library: ${e.message}")
-            }
-        }
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        // Permission result handled
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Initialize Android context for model file handling
-        initializeAndroidContext(this)
+        CactusContextInitializer.initialize(this)
         
-        // Initialize Android context for speech recognition
-        initializeAndroidSpeechContext(this)
+        // Request microphone permission if not granted
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
         
-        enableEdgeToEdge()
         setContent {
-            LaunchedEffect(isSystemInDarkTheme()) {
-                enableEdgeToEdge()
-            }
             App()
         }
     }
+}
+
+@Preview
+@Composable
+fun AppAndroidPreview() {
+    App()
 } 

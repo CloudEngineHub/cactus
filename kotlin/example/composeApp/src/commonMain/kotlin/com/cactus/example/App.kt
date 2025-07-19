@@ -9,59 +9,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import com.cactus.Cactus
-import com.cactus.CactusInitParams
-import com.cactus.CactusCompletionParams
-import com.cactus.SpeechRecognitionParams
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.utils.io.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
+import com.cactus.CactusLM
+import com.cactus.CactusVLM
+import com.cactus.CactusSTT
+import com.cactus.CactusTTS
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 
-expect fun getModelCacheDir(): String
-expect suspend fun downloadModelStreaming(url: String, fileName: String, onProgress: (Float) -> Unit): String?
-
 @Composable
 fun App() {
     val scope = rememberCoroutineScope()
-    var cactus by remember { mutableStateOf<Cactus?>(null) }
-    var isInitialized by remember { mutableStateOf(false) }
-    var modelPath by remember { mutableStateOf<String?>(null) }
-    var logs by remember { mutableStateOf(listOf<String>()) }
-    var isDownloading by remember { mutableStateOf(false) }
-    var downloadProgress by remember { mutableStateOf(0f) }
+    val lm = remember { CactusLM() }
+    val vlm = remember { CactusVLM() }
+    val stt = remember { CactusSTT() }
+    val tts = remember { CactusTTS() }
     
-    // Initialize logging
-    LaunchedEffect(Unit) {
-        logs = listOf("📱 App started successfully", "👋 Welcome to Cactus Demo!")
-    }
-
+    var logs by remember { mutableStateOf(listOf<String>()) }
+    
     fun addLog(message: String) {
         logs = logs + "${logs.size + 1}. $message"
     }
     
-    suspend fun downloadModel(): String? {
-        return withContext(Dispatchers.Default) {
-            try {
-                val modelUrl = "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"
-                val fileName = "Qwen3-0.6B-Q8_0.gguf"
-                
-                addLog("Starting model download...")
-                
-                downloadModelStreaming(modelUrl, fileName) { progress ->
-                    downloadProgress = progress
-                }
-            } catch (e: Exception) {
-                addLog("Download failed: ${e.message}")
-                null
-            }
-        }
+    LaunchedEffect(Unit) {
+        addLog("App started - Cactus Modular Demo")
+        addLog("Available: Language Model, Vision, Speech-to-Text, Text-to-Speech")
     }
     
     MaterialTheme {
@@ -77,219 +49,190 @@ fun App() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Cactus Demo",
+                    text = "Cactus Modular Demo",
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
-                if (isDownloading) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(progress = { downloadProgress })
+                // Language Model Section
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Language Model", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Downloading model: ${(downloadProgress * 100).toInt()}%")
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-                
-                Button(
-                    onClick = {
-                        addLog("Download button clicked")
-                        scope.launch {
-                            isDownloading = true
-                            downloadProgress = 0f
-                            val downloadedModelPath = downloadModel()
-                            isDownloading = false
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Downloading LM model...")
+                                        val success = lm.download()
+                                        addLog(if (success) "LM model downloaded" else "LM download failed")
+                                    }
+                                }
+                            ) { Text("Download") }
                             
-                            if (downloadedModelPath != null) {
-                                modelPath = downloadedModelPath
-                                addLog("✓ Model downloaded successfully!")
-                                addLog("Model saved to: $downloadedModelPath")
-                            } else {
-                                addLog("✗ Failed to download model")
-                            }
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Loading LM model...")
+                                        val success = lm.load("Qwen3-0.6B-Q8_0.gguf")
+                                        addLog(if (success) "LM model loaded" else "LM load failed")
+                                    }
+                                }
+                            ) { Text("Load") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Generating text...")
+                                        val result = lm.completion("What is AI?", maxTokens = 50)
+                                        addLog("LM: ${result ?: "No response"}")
+                                    }
+                                }
+                            ) { Text("Generate") }
                         }
-                    },
-                    enabled = !isDownloading && modelPath == null
-                ) {
-                    Text("Download Model")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = {
-                        addLog("Initialize button clicked")
-                        val currentModelPath = modelPath
-                        if (currentModelPath != null) {
-                            addLog("Initializing Cactus...")
-                            scope.launch {
-                            try {
-                                addLog("Creating Cactus instance...")
-                                val instance = Cactus()
-                                addLog("Setting up initialization parameters...")
-                                val params = CactusInitParams(
-                                    modelPath = currentModelPath,
-                                    nCtx = 2048,
-                                    nThreads = 4
-                                )
-                                addLog("Calling initialize...")
-                                val success = instance.initialize(params)
-                                if (success) {
-                                    cactus = instance
-                                    isInitialized = true
-                                    addLog("✓ Cactus initialized successfully!")
-                                } else {
-                                    addLog("✗ Failed to initialize Cactus")
-                                }
-                            } catch (e: Exception) {
-                                addLog("✗ Error: ${e.message}")
-                                addLog("Exception type: ${e::class.simpleName}")
-                                }
-                            }
-                        } else {
-                            addLog("Please download the model first")
-                        }
-                    },
-                    enabled = !isInitialized && modelPath != null && !isDownloading
-                ) {
-                    Text("Initialize Cactus")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = {
-                        cactus?.let { c ->
-                            addLog("Getting model info...")
-                            try {
-                                val desc = c.getModelDesc()
-                                val size = c.getModelSize()
-                                val params = c.getModelParams()
-                                addLog("Model: $desc")
-                                addLog("Size: ${size / 1024 / 1024} MB")
-                                addLog("Parameters: ${params / 1_000_000}M")
-                            } catch (e: Exception) {
-                                addLog("✗ Error getting model info: ${e.message}")
-                            }
-                        } ?: run { addLog("Please initialize Cactus first") }
-                    },
-                    enabled = isInitialized
-                ) {
-                    Text("Get Model Info")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = {
-                        cactus?.let { c ->
-                            addLog("Tokenizing text...")
-                            scope.launch {
-                            try {
-                                val result = c.tokenize("Hello, world!")
-                                result?.let { r ->
-                                    addLog("Tokens: ${r.tokens.contentToString()}")
-                                    addLog("Token count: ${r.count}")
-                                }
-                            } catch (e: Exception) {
-                                addLog("✗ Error tokenizing: ${e.message}")
-                                }
-                            }
-                        } ?: run { addLog("Please initialize Cactus first") }
-                    },
-                    enabled = isInitialized
-                ) {
-                    Text("Tokenize Text")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = {
-                        cactus?.let { c ->
-                            addLog("Running benchmark...")
-                            scope.launch {
-                            try {
-                                val result = c.bench(pp = 512, tg = 128, pl = 1, nr = 1)
-                                result?.let { r ->
-                                    addLog("Benchmark Results:")
-                                    addLog("PP Avg: ${r.ppAvg} tokens/s")
-                                    addLog("TG Avg: ${r.tgAvg} tokens/s")
-                                }
-                            } catch (e: Exception) {
-                                addLog("✗ Error running benchmark: ${e.message}")
-                                }
-                            }
-                        } ?: run { addLog("Please initialize Cactus first") }
-                    },
-                    enabled = isInitialized
-                ) {
-                    Text("Run Benchmark")
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Button(
-                    onClick = {
-                        cactus?.let { c ->
-                            addLog("Generating completion...")
-                            scope.launch {
-                            try {
-                                val params = CactusCompletionParams(
-                                    prompt = "What is the capital of France?",
-                                    nPredict = 50,
-                                    temperature = 0.7
-                                )
-                                val result = c.completion(params)
-                                result?.let { r ->
-                                    addLog("Completion: ${r.text}")
-                                    addLog("Tokens: ${r.tokensPredicted}")
-                                }
-                            } catch (e: Exception) {
-                                addLog("✗ Error generating completion: ${e.message}")
-                                }
-                            }
-                        } ?: run { addLog("Please initialize Cactus first") }
-                    },
-                    enabled = isInitialized
-                ) {
-                    Text("Generate Text")
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                HorizontalDivider()
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "Speech Recognition:",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                SpeechRecordButton(
-                    cactus = cactus,
-                    modifier = Modifier.fillMaxWidth(),
-                    onTextRecognized = { text ->
-                        addLog("🎤 Speech: \"$text\"")
-                    },
-                    onError = { error ->
-                        addLog("✗ Speech error: $error")
                     }
-                )
+                }
+                
+                // Vision Language Model Section
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Vision Language Model", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Downloading VLM models...")
+                                        val success = vlm.download()
+                                        addLog(if (success) "VLM models downloaded" else "VLM download failed")
+                                    }
+                                }
+                            ) { Text("Download") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Loading VLM model...")
+                                        val success = vlm.load("SmolVLM2-500M-Video-Instruct-Q8_0.gguf")
+                                        addLog(if (success) "VLM model loaded" else "VLM load failed")
+                                    }
+                                }
+                            ) { Text("Load") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Analyzing image...")
+                                        val result = vlm.completion("Describe this", "image.jpg", maxTokens = 50)
+                                        addLog("VLM: ${result ?: "No response"}")
+                                    }
+                                }
+                            ) { Text("Analyze") }
+                        }
+                    }
+                }
+                
+                // Speech to Text Section
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Speech to Text", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Downloading STT model...")
+                                        val downloadSuccess = stt.download()
+                                        if (downloadSuccess) {
+                                            addLog("Initializing STT...")
+                                            val initSuccess = stt.initialize()
+                                            addLog(if (initSuccess) "STT ready" else "STT init failed")
+                                        } else {
+                                            addLog("STT download failed")
+                                        }
+                                    }
+                                }
+                            ) { Text("Setup") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        if (!stt.isReady()) {
+                                            addLog("Setting up STT first...")
+                                            val downloadSuccess = stt.download()
+                                            if (downloadSuccess) {
+                                                val initSuccess = stt.initialize()
+                                                if (!initSuccess) {
+                                                    addLog("STT initialization failed")
+                                                    return@launch
+                                                }
+                                            } else {
+                                                addLog("STT download failed")
+                                                return@launch
+                                            }
+                                        }
+                                        
+                                        addLog("Listening...")
+                                        val result = stt.transcribe()
+                                        addLog("STT: ${result?.text ?: "No speech detected"}")
+                                    }
+                                }
+                            ) { Text("Listen") }
+                        }
+                    }
+                }
+                
+                // Text to Speech Section
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Text to Speech", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Setting up TTS...")
+                                        val downloadSuccess = tts.download("https://example.com/tts.gguf")
+                                        if (downloadSuccess) {
+                                            val initSuccess = tts.initialize()
+                                            addLog(if (initSuccess) "TTS ready" else "TTS init failed")
+                                        } else {
+                                            addLog("TTS download failed")
+                                        }
+                                    }
+                                }
+                            ) { Text("Setup") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Speaking...")
+                                        val success = tts.speak("Hello from Cactus TTS")
+                                        addLog(if (success) "TTS completed" else "TTS failed")
+                                    }
+                                }
+                            ) { Text("Speak") }
+                        }
+                    }
+                }
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                
                 HorizontalDivider()
-                
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Text(
-                    text = "Logs:",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text("Logs:", style = MaterialTheme.typography.titleMedium)
                 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -304,12 +247,6 @@ fun App() {
                     }
                 }
             }
-        }
-    }
-    
-    DisposableEffect(Unit) {
-        onDispose {
-            cactus?.close()
         }
     }
 } 
