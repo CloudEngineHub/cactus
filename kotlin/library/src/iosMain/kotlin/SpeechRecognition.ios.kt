@@ -226,11 +226,11 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
         }
         
         silenceTimer = NSTimer.scheduledTimerWithTimeInterval(
-            interval = 5.0, 
+            interval = 1.0, 
             repeats = false
         ) { _ ->
             if (!hasFinalResult && !hasDetectedSpeech) {
-                println("No speech detected in 5 seconds, stopping...")
+                println("No speech detected in 1 second, stopping...")
                 hasFinalResult = true
                 stopCurrentRecognition()
                 timeoutTimer?.invalidate()

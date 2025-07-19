@@ -198,7 +198,7 @@ actual suspend fun performSpeechRecognition(params: SpeechRecognitionParams): Sp
                 var lastPartialResult = ""
                 var silenceStartTime = 0L
                 var lastSpeechTime = System.currentTimeMillis()
-                val maxSilenceDuration = 2000L 
+                val maxSilenceDuration = 1000L 
                 val maxRecordingDuration = 30000L
                 val recordingStartTime = System.currentTimeMillis()
                 
