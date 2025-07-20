@@ -9,6 +9,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.cactus.CactusLM
 import com.cactus.CactusVLM
 import com.cactus.CactusSTT
@@ -16,6 +18,9 @@ import com.cactus.CactusSTT
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import kmp_app_template.composeapp.generated.resources.Res
 
 @Composable
 fun App() {
@@ -188,7 +193,20 @@ fun App() {
                                 onClick = {
                                     scope.launch {
                                         addLog("Analyzing image with $currentGpuMode...")
-                                        val result = vlm.completion("Describe this", "image.jpg", maxTokens = 50)
+                                        val result = withContext(Dispatchers.Default) {
+                                            try {
+                                                @OptIn(ExperimentalResourceApi::class)
+                                                val imageBytes = Res.readBytes("files/image.jpg")
+                                                val imagePath = saveImageToTempFile(imageBytes)
+                                                if (imagePath != null) {
+                                                    vlm.completion("Describe this", imagePath, maxTokens = 50)
+                                                } else {
+                                                    null
+                                                }
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                        }
                                         addLog("VLM ($currentGpuMode): ${result ?: "No response"}")
                                     }
                                 }

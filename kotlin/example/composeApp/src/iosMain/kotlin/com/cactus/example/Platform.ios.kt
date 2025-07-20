@@ -2,9 +2,30 @@
 package com.cactus.example
 
 import kotlinx.cinterop.*
-import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.Foundation.*
-import platform.darwin.NSObject
-import kotlin.coroutines.resume
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
- 
+actual suspend fun saveImageToTempFile(imageBytes: ByteArray): String? {
+    return withContext(Dispatchers.Default) {
+        try {
+            val documentsDir = NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, true
+            ).firstOrNull() as? String ?: return@withContext null
+            
+            val targetPath = "$documentsDir/temp_image.jpg"
+            
+            val data = imageBytes.toNSData()
+            data.writeToFile(targetPath, true)
+            
+            targetPath
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+private fun ByteArray.toNSData(): NSData = memScoped {
+    NSData.create(bytes = allocArrayOf(this@toNSData), length = this@toNSData.size.toULong())
+} 
