@@ -1,5 +1,6 @@
 package com.cactus
 
+import android.util.Log
 import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -19,10 +20,10 @@ interface TokenCallback : Callback {
 
 @Structure.FieldOrder(
     "model_path", "chat_template", "n_ctx", "n_batch", "n_ubatch", "n_gpu_layers", 
-    "n_threads", "use_mmap", "use_mlock", "embedding", "pooling_type", "embd_normalize",
-    "flash_attn", "cache_type_k", "cache_type_v", "progress_callback"
+    "n_threads", "use_mmap", "use_mlock", "embedding", "pooling_type", 
+    "embd_normalize", "flash_attn", "cache_type_k", "cache_type_v", "progress_callback"
 )
-internal class CactusInitParamsC : Structure() {
+internal class CactusInitParamsC : Structure(), Structure.ByReference {
     @JvmField var model_path: String? = null
     @JvmField var chat_template: String? = null
     @JvmField var n_ctx: Int = 0
@@ -30,12 +31,12 @@ internal class CactusInitParamsC : Structure() {
     @JvmField var n_ubatch: Int = 0
     @JvmField var n_gpu_layers: Int = 0
     @JvmField var n_threads: Int = 0
-    @JvmField var use_mmap: Boolean = false
-    @JvmField var use_mlock: Boolean = false
-    @JvmField var embedding: Boolean = false
+    @JvmField var use_mmap: Byte = 1    
+    @JvmField var use_mlock: Byte = 0   
+    @JvmField var embedding: Byte = 0   
     @JvmField var pooling_type: Int = 0
     @JvmField var embd_normalize: Int = 0
-    @JvmField var flash_attn: Boolean = false
+    @JvmField var flash_attn: Byte = 0  
     @JvmField var cache_type_k: String? = null
     @JvmField var cache_type_v: String? = null
     @JvmField var progress_callback: ProgressCallback? = null
@@ -64,7 +65,7 @@ internal class CactusCompletionParamsC() : Structure(), Structure.ByReference {
     @JvmField var mirostat: Int = 0
     @JvmField var mirostat_tau: Double = 0.0
     @JvmField var mirostat_eta: Double = 0.0
-    @JvmField var ignore_eos: Boolean = false
+    @JvmField var ignore_eos: Byte = 0   
     @JvmField var n_probs: Int = 0
     @JvmField var stop_sequences: Pointer? = null
     @JvmField var stop_sequence_count: Int = 0
@@ -72,24 +73,28 @@ internal class CactusCompletionParamsC() : Structure(), Structure.ByReference {
     @JvmField var token_callback: TokenCallback? = null
     
     init {
-        // Ensure proper field initialization
+        stop_sequences = Pointer.NULL
+        stop_sequence_count = 0
+        token_callback = null
+        clear()
+    }
+    
+    override fun clear() {
+        super.clear()
         stop_sequences = Pointer.NULL
         token_callback = null
     }
 }
 
-@Structure.FieldOrder(
-    "text", "tokens_predicted", "tokens_evaluated", "truncated", "stopped_eos", 
-    "stopped_word", "stopped_limit", "stopping_word"
-)
+@Structure.FieldOrder("text", "tokens_predicted", "tokens_evaluated", "truncated", "stopped_eos", "stopped_word", "stopped_limit", "stopping_word")
 internal class CactusCompletionResultC : Structure(), Structure.ByReference {
     @JvmField var text: Pointer? = null
     @JvmField var tokens_predicted: Int = 0
     @JvmField var tokens_evaluated: Int = 0
-    @JvmField var truncated: Boolean = false
-    @JvmField var stopped_eos: Boolean = false
-    @JvmField var stopped_word: Boolean = false
-    @JvmField var stopped_limit: Boolean = false
+    @JvmField var truncated: Byte = 0       
+    @JvmField var stopped_eos: Byte = 0   
+    @JvmField var stopped_word: Byte = 0   
+    @JvmField var stopped_limit: Byte = 0 
     @JvmField var stopping_word: Pointer? = null
 }
 
@@ -228,21 +233,43 @@ actual object CactusContext {
             n_ctx = params.nCtx
             n_batch = params.nBatch
             n_ubatch = params.nUbatch
-            n_gpu_layers = params.nGpuLayers
+            n_gpu_layers = 0  // Always 0 on Android - GPU not supported
             n_threads = params.nThreads
-            use_mmap = params.useMmap
-            use_mlock = params.useMlock
-            embedding = params.embedding
+            use_mmap = if (params.useMmap) 1.toByte() else 0.toByte()
+            use_mlock = if (params.useMlock) 1.toByte() else 0.toByte()
+            embedding = if (params.embedding) 1.toByte() else 0.toByte()
             pooling_type = params.poolingType
             embd_normalize = params.embdNormalize
-            flash_attn = params.flashAttn
+            flash_attn = if (params.flashAttn) 1.toByte() else 0.toByte()
             cache_type_k = params.cacheTypeK
             cache_type_v = params.cacheTypeV
+            progress_callback = null
         }
+
+        Log.d("CactusInit", "About to write JNA structure to native memory")
+        Log.d("CactusInit", "GPU layers: ${cParams.n_gpu_layers}")
+        Log.d("CactusInit", "useMmap: ${params.useMmap} -> byte: ${cParams.use_mmap}")
+        Log.d("CactusInit", "useMlock: ${params.useMlock} -> byte: ${cParams.use_mlock}")
+        Log.d("CactusInit", "embedding: ${params.embedding} -> byte: ${cParams.embedding}")
+        Log.d("CactusInit", "flashAttn: ${params.flashAttn} -> byte: ${cParams.flash_attn}")
         
-        cParams.write() 
-        val handle = lib.cactus_init_context_c(cParams)
-        return@withContext handle?.let { Pointer.nativeValue(it) }
+        cParams.write()
+        
+        Log.d("CactusInit", "Calling native function...")
+        
+        try {
+            val handle = lib.cactus_init_context_c(cParams)
+            val success = handle != Pointer.NULL
+            Log.d("CactusInit", "Context initialization result: $success")
+            if (success) {
+                Pointer.nativeValue(handle)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("CactusInit", "Exception during context initialization: ${e.message}", e)
+            null
+        }
     }
     
     actual fun freeContext(handle: CactusContextHandle) {
@@ -269,7 +296,7 @@ actual object CactusContext {
             mirostat = params.mirostat
             mirostat_tau = params.mirostatTau
             mirostat_eta = params.mirostatEta
-            ignore_eos = params.ignoreEos
+            ignore_eos = if (params.ignoreEos) 1.toByte() else 0.toByte()
             n_probs = params.nProbs
             stop_sequences = Pointer.NULL
             stop_sequence_count = 0
@@ -278,22 +305,55 @@ actual object CactusContext {
         }
 
         val result = CactusCompletionResultC()
-        result.write()  
-        cParams.write() 
-        lib.cactus_completion_c(Pointer(handle), cParams, result)
-        result.read() 
         
-        return@withContext CactusCompletionResult(
-            text = result.text?.getString(0) ?: "",
-            tokensPredicted = result.tokens_predicted,
-            tokensEvaluated = result.tokens_evaluated,
-            truncated = result.truncated,
-            stoppedEos = result.stopped_eos,
-            stoppedWord = result.stopped_word,
-            stoppedLimit = result.stopped_limit,
-            stoppingWord = result.stopping_word?.getString(0) ?: ""
-        ).also {
-            lib.cactus_free_completion_result_members_c(result)
+        try {
+            Log.d("CactusCompletion", "Starting completion with prompt: ${params.prompt?.take(50)}...")
+            
+            result.clear()
+            result.write()  
+            cParams.write() 
+            
+            Log.d("CactusCompletion", "Calling native cactus_completion_c...")
+            val returnCode = lib.cactus_completion_c(Pointer(handle), cParams, result)
+            Log.d("CactusCompletion", "Native call returned: $returnCode")
+            if (returnCode != 0) {
+                return@withContext CactusCompletionResult(
+                    text = "Error: completion failed with code $returnCode",
+                    tokensPredicted = 0,
+                    tokensEvaluated = 0,
+                    truncated = false,
+                    stoppedEos = false,
+                    stoppedWord = false,
+                    stoppedLimit = false,
+                    stoppingWord = ""
+                )
+            }
+            
+            result.read() 
+            
+            return@withContext CactusCompletionResult(
+                text = result.text?.getString(0) ?: "",
+                tokensPredicted = result.tokens_predicted,
+                tokensEvaluated = result.tokens_evaluated,
+                truncated = result.truncated != 0.toByte(),
+                stoppedEos = result.stopped_eos != 0.toByte(),
+                stoppedWord = result.stopped_word != 0.toByte(),
+                stoppedLimit = result.stopped_limit != 0.toByte(),
+                stoppingWord = result.stopping_word?.getString(0) ?: ""
+            ).also {
+                lib.cactus_free_completion_result_members_c(result)
+            }
+        } catch (e: Exception) {
+            return@withContext CactusCompletionResult(
+                text = "Error: ${e.message}",
+                tokensPredicted = 0,
+                tokensEvaluated = 0,
+                truncated = false,
+                stoppedEos = false,
+                stoppedWord = false,
+                stoppedLimit = false,
+                stoppingWord = ""
+            )
         }
     }
     
@@ -315,7 +375,7 @@ actual object CactusContext {
             mirostat = params.mirostat
             mirostat_tau = params.mirostatTau
             mirostat_eta = params.mirostatEta
-            ignore_eos = params.ignoreEos
+            ignore_eos = if (params.ignoreEos) 1.toByte() else 0.toByte()
             n_probs = params.nProbs
             stop_sequences = Pointer.NULL
             stop_sequence_count = 0
@@ -332,10 +392,10 @@ actual object CactusContext {
             text = result.text?.getString(0) ?: "",
             tokensPredicted = result.tokens_predicted,
             tokensEvaluated = result.tokens_evaluated,
-            truncated = result.truncated,
-            stoppedEos = result.stopped_eos,
-            stoppedWord = result.stopped_word,
-            stoppedLimit = result.stopped_limit,
+            truncated = result.truncated != 0.toByte(),
+            stoppedEos = result.stopped_eos != 0.toByte(),
+            stoppedWord = result.stopped_word != 0.toByte(),
+            stoppedLimit = result.stopped_limit != 0.toByte(),
             stoppingWord = result.stopping_word?.getString(0) ?: ""
         ).also {
             lib.cactus_free_completion_result_members_c(result)

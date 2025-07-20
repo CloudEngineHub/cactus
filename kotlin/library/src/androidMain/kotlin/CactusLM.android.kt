@@ -1,6 +1,7 @@
 package com.cactus
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -37,26 +38,53 @@ actual suspend fun downloadModel(url: String, filename: String): Boolean {
 actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int): Long? {
     return withContext(Dispatchers.Default) {
         try {
+            Log.d("CactusLM", "Loading model: $path")
             val modelsDir = File(applicationContext.cacheDir, "models")
             val modelFile = File(modelsDir, path)
             
-            if (!modelFile.exists()) return@withContext null
+            if (!modelFile.exists()) {
+                Log.e("CactusLM", "Model file not found: ${modelFile.absolutePath}")
+                return@withContext null
+            }
             
+            Log.d("CactusLM", "Model file found: ${modelFile.absolutePath}")
+            
+            Log.d("CactusLM", "DEBUGGING: About to create CactusInitParams with useMmap = true")
             val params = CactusInitParams(
                 modelPath = modelFile.absolutePath,
                 nCtx = contextSize,
                 nThreads = threads,
-                nBatch = batchSize
+                nBatch = batchSize,
+                nGpuLayers = 0, // !! Never set this to anything other than 0
+                useMmap = true // !! Never set this to anything other than true
             )
+            Log.d("CactusLM", "DEBUGGING: Created CactusInitParams, useMmap = ${params.useMmap}")
+            Log.d("CactusLM", "DEBUGGING: useMmap type = ${params.useMmap::class.simpleName}")
+            Log.d("CactusLM", "DEBUGGING: useMmap toString() = ${params.useMmap.toString()}")
+            Log.d("CactusLM", "DEBUGGING: useMmap === true = ${params.useMmap === true}")
+            Log.d("CactusLM", "DEBUGGING: useMmap == true = ${params.useMmap == true}")
             
+            Log.d("CactusLM", "Created CactusInitParams:")
+            Log.d("CactusLM", "  modelPath: ${params.modelPath}")
+            Log.d("CactusLM", "  nCtx: ${params.nCtx}")
+            Log.d("CactusLM", "  nThreads: ${params.nThreads}")
+            Log.d("CactusLM", "  nBatch: ${params.nBatch}")
+            Log.d("CactusLM", "  nGpuLayers: ${params.nGpuLayers}")
+            Log.d("CactusLM", "  useMmap: ${params.useMmap}")
+            Log.d("CactusLM", "  useMlock: ${params.useMlock}")
+            
+            Log.d("CactusLM", "Initializing context...")
             val handle = CactusContext.initContext(params)
             if (handle != null) {
                 currentHandle = handle
+                Log.d("CactusLM", "Model loaded successfully with handle: $handle")
                 handle
             } else {
+                Log.e("CactusLM", "Failed to initialize context")
                 null
             }
         } catch (e: Exception) {
+            Log.e("CactusLM", "Exception loading model: ${e.message}", e)
             null
         }
     }
@@ -65,6 +93,7 @@ actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batch
 actual suspend fun generateCompletion(handle: Long, prompt: String, maxTokens: Int, temperature: Float, topP: Float): String? {
     return withContext(Dispatchers.Default) {
         try {
+            Log.d("CactusLM", "Generating completion for prompt: ${prompt.take(50)}...")
             val params = CactusCompletionParams(
                 prompt = prompt,
                 nPredict = maxTokens,
@@ -72,9 +101,12 @@ actual suspend fun generateCompletion(handle: Long, prompt: String, maxTokens: I
                 topP = topP.toDouble()
             )
             
+            Log.d("CactusLM", "Calling CactusContext.completion...")
             val result = CactusContext.completion(handle, params)
+            Log.d("CactusLM", "Completion result: ${result.text?.take(50)}...")
             result.text
         } catch (e: Exception) {
+            Log.e("CactusLM", "Exception generating completion: ${e.message}", e)
             null
         }
     }

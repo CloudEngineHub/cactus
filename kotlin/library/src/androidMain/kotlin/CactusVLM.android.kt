@@ -52,7 +52,7 @@ actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: 
             
             val handle = CactusContext.initContext(params)
             if (handle != null) {
-                val mmResult = CactusContext.initMultimodal(handle, mmprojFile.absolutePath, true)
+                val mmResult = CactusContext.initMultimodal(handle, mmprojFile.absolutePath, false) // Changed from true to false for Android
                 if (mmResult == 0) {
                     currentVLMHandle = handle
                     handle
