@@ -3,7 +3,8 @@ package com.cactus
 class CactusVLM(
     private val threads: Int = 4,
     private val contextSize: Int = 2048,
-    private val batchSize: Int = 512
+    private val batchSize: Int = 512,
+    private val gpuLayers: Int = 0
 ) {
     private var handle: Long? = null
     private var lastDownloadedModelFilename: String? = null
@@ -35,7 +36,7 @@ class CactusVLM(
     ): Boolean {
         val actualModelFilename = modelFilename ?: "SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
         val actualMmprojFilename = mmprojFilename ?: "mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
-        handle = loadVLMModel(actualModelFilename, actualMmprojFilename, threads, contextSize, batchSize)
+        handle = loadVLMModel(actualModelFilename, actualMmprojFilename, threads, contextSize, batchSize, gpuLayers)
         return handle != null
     }
     
@@ -62,6 +63,6 @@ class CactusVLM(
 }
 
 expect suspend fun downloadVLMModel(url: String, filename: String): Boolean
-expect suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: Int, contextSize: Int, batchSize: Int): Long?
+expect suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: Int, contextSize: Int, batchSize: Int, gpuLayers: Int): Long?
 expect suspend fun generateVLMCompletion(handle: Long, prompt: String, imagePath: String, maxTokens: Int, temperature: Float, topP: Float): String?
 expect fun unloadVLMModel(handle: Long) 

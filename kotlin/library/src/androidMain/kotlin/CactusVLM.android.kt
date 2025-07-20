@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.URL
+import android.util.Log
 
 private var currentVLMHandle: Long? = null
 
@@ -34,7 +35,7 @@ actual suspend fun downloadVLMModel(url: String, filename: String): Boolean {
     }
 }
 
-actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: Int, contextSize: Int, batchSize: Int): Long? {
+actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: Int, contextSize: Int, batchSize: Int, gpuLayers: Int): Long? {
     return withContext(Dispatchers.Default) {
         try {
             val modelsDir = File(applicationContext.cacheDir, "models")
@@ -43,16 +44,22 @@ actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: 
             
             if (!modelFile.exists() || !mmprojFile.exists()) return@withContext null
             
+            val actualGpuLayers = 0
+            if (gpuLayers == 99) {
+                Log.w("CactusVLM", "GPU acceleration requested but not supported on Android. Using CPU.")
+            }
+            
             val params = CactusInitParams(
                 modelPath = modelFile.absolutePath,
                 nCtx = contextSize,
                 nThreads = threads,
-                nBatch = batchSize
+                nBatch = batchSize,
+                nGpuLayers = actualGpuLayers
             )
             
             val handle = CactusContext.initContext(params)
             if (handle != null) {
-                val mmResult = CactusContext.initMultimodal(handle, mmprojFile.absolutePath, false) // Changed from true to false for Android
+                val mmResult = CactusContext.initMultimodal(handle, mmprojFile.absolutePath, false)
                 if (mmResult == 0) {
                     currentVLMHandle = handle
                     handle

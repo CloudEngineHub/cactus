@@ -34,7 +34,7 @@ actual suspend fun downloadModel(url: String, filename: String): Boolean {
     }
 }
 
-actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int): Long? {
+actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int, gpuLayers: Int): Long? {
     return withContext(Dispatchers.Default) {
         try {
             val documentsDir = NSSearchPathForDirectoriesInDomains(
@@ -46,11 +46,18 @@ actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batch
                 return@withContext null
             }
             
+            val actualGpuLayers = when (gpuLayers) {
+                0 -> 0
+                99 -> 99
+                else -> 0
+            }
+            
             val params = CactusInitParams(
                 modelPath = fullModelPath,
                 nCtx = contextSize,
                 nThreads = threads,
-                nBatch = batchSize
+                nBatch = batchSize,
+                nGpuLayers = actualGpuLayers
             )
             
             val handle = CactusContext.initContext(params)

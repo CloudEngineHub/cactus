@@ -34,7 +34,7 @@ actual suspend fun downloadVLMModel(url: String, filename: String): Boolean {
     }
 }
 
-actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: Int, contextSize: Int, batchSize: Int): Long? {
+actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: Int, contextSize: Int, batchSize: Int, gpuLayers: Int): Long? {
     return withContext(Dispatchers.Default) {
         try {
             val documentsDir = NSSearchPathForDirectoriesInDomains(
@@ -49,16 +49,29 @@ actual suspend fun loadVLMModel(modelPath: String, mmprojPath: String, threads: 
                 return@withContext null
             }
             
+            val useGpu = when (gpuLayers) {
+                0 -> false
+                99 -> true
+                else -> false
+            }
+            
+            val actualGpuLayers = when (gpuLayers) {
+                0 -> 0
+                99 -> 99
+                else -> 0
+            }
+            
             val params = CactusInitParams(
                 modelPath = fullModelPath,
                 nCtx = contextSize,
                 nThreads = threads,
-                nBatch = batchSize
+                nBatch = batchSize,
+                nGpuLayers = actualGpuLayers
             )
             
             val handle = CactusContext.initContext(params)
             if (handle != null) {
-                val mmResult = CactusContext.initMultimodal(handle, fullMmprojPath, true)
+                val mmResult = CactusContext.initMultimodal(handle, fullMmprojPath, useGpu)
                 if (mmResult == 0) {
                     currentVLMHandle = handle
                     handle

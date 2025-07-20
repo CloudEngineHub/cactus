@@ -20,11 +20,12 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 @Composable
 fun App() {
     val scope = rememberCoroutineScope()
-    val lm = remember { CactusLM() }
-    val vlm = remember { CactusVLM() }
+    var lm by remember { mutableStateOf(CactusLM()) }
+    var vlm by remember { mutableStateOf(CactusVLM()) }
     val stt = remember { CactusSTT() }
     
     var logs by remember { mutableStateOf(listOf<String>()) }
+    var currentGpuMode by remember { mutableStateOf("CPU") }
     
     fun addLog(message: String) {
         logs = logs + "${logs.size + 1}. $message"
@@ -58,9 +59,39 @@ fun App() {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Language Model", style = MaterialTheme.typography.titleMedium)
+                        Text("Language Model - Mode: $currentGpuMode", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         
+                        // GPU Mode Selection
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Switching to CPU mode (GPU=0)...")
+                                        lm.unload()
+                                        lm = CactusLM(gpuLayers = 0)
+                                        currentGpuMode = "CPU"
+                                        addLog("Switched to CPU mode")
+                                    }
+                                }
+                            ) { Text("CPU Mode") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Switching to GPU mode (GPU=99)...")
+                                        lm.unload()
+                                        lm = CactusLM(gpuLayers = 99)
+                                        currentGpuMode = "GPU"
+                                        addLog("Switched to GPU mode")
+                                    }
+                                }
+                            ) { Text("GPU Mode") }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Model Operations
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = {
@@ -75,9 +106,9 @@ fun App() {
                             Button(
                                 onClick = {
                                     scope.launch {
-                                        addLog("Loading LM model...")
+                                        addLog("Loading LM model in $currentGpuMode mode...")
                                         val success = lm.init()
-                                        addLog(if (success) "LM model loaded" else "LM load failed")
+                                        addLog(if (success) "LM model loaded in $currentGpuMode mode" else "LM load failed")
                                     }
                                 }
                             ) { Text("Load") }
@@ -85,9 +116,9 @@ fun App() {
                             Button(
                                 onClick = {
                                     scope.launch {
-                                        addLog("Generating text...")
+                                        addLog("Generating text with $currentGpuMode...")
                                         val result = lm.completion("What is AI?", maxTokens = 50)
-                                        addLog("LM: ${result ?: "No response"}")
+                                        addLog("LM ($currentGpuMode): ${result ?: "No response"}")
                                     }
                                 }
                             ) { Text("Generate") }
@@ -100,7 +131,36 @@ fun App() {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Vision Language Model", style = MaterialTheme.typography.titleMedium)
+                        Text("Vision Language Model - Mode: $currentGpuMode", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // GPU Mode Selection for VLM  
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Switching VLM to CPU mode (GPU=0)...")
+                                        vlm.unload()
+                                        vlm = CactusVLM(gpuLayers = 0)
+                                        currentGpuMode = "CPU"
+                                        addLog("VLM switched to CPU mode")
+                                    }
+                                }
+                            ) { Text("VLM CPU") }
+                            
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        addLog("Switching VLM to GPU mode (GPU=99)...")
+                                        vlm.unload()
+                                        vlm = CactusVLM(gpuLayers = 99)
+                                        currentGpuMode = "GPU"
+                                        addLog("VLM switched to GPU mode")
+                                    }
+                                }
+                            ) { Text("VLM GPU") }
+                        }
+                        
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -117,9 +177,9 @@ fun App() {
                             Button(
                                 onClick = {
                                     scope.launch {
-                                        addLog("Loading VLM model...")
+                                        addLog("Loading VLM model in $currentGpuMode mode...")
                                         val success = vlm.init()
-                                        addLog(if (success) "VLM model loaded" else "VLM load failed")
+                                        addLog(if (success) "VLM model loaded in $currentGpuMode mode" else "VLM load failed")
                                     }
                                 }
                             ) { Text("Load") }
@@ -127,9 +187,9 @@ fun App() {
                             Button(
                                 onClick = {
                                     scope.launch {
-                                        addLog("Analyzing image...")
+                                        addLog("Analyzing image with $currentGpuMode...")
                                         val result = vlm.completion("Describe this", "image.jpg", maxTokens = 50)
-                                        addLog("VLM: ${result ?: "No response"}")
+                                        addLog("VLM ($currentGpuMode): ${result ?: "No response"}")
                                     }
                                 }
                             ) { Text("Analyze") }

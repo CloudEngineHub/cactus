@@ -35,7 +35,7 @@ actual suspend fun downloadModel(url: String, filename: String): Boolean {
     }
 }
 
-actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int): Long? {
+actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int, gpuLayers: Int): Long? {
     return withContext(Dispatchers.Default) {
         try {
             Log.d("CactusLM", "Loading model: $path")
@@ -49,14 +49,20 @@ actual suspend fun loadModel(path: String, threads: Int, contextSize: Int, batch
             
             Log.d("CactusLM", "Model file found: ${modelFile.absolutePath}")
             
+            val actualGpuLayers = 0
+            if (gpuLayers == 99) {
+                Log.w("CactusLM", "GPU acceleration requested but not supported on Android. Using CPU.")
+            }
+            
+            Log.d("CactusLM", "GPU layers requested: $gpuLayers, actual: $actualGpuLayers (Android always uses CPU)")
             Log.d("CactusLM", "DEBUGGING: About to create CactusInitParams with useMmap = true")
             val params = CactusInitParams(
                 modelPath = modelFile.absolutePath,
                 nCtx = contextSize,
                 nThreads = threads,
                 nBatch = batchSize,
-                nGpuLayers = 0, // !! Never set this to anything other than 0
-                useMmap = true // !! Never set this to anything other than true
+                nGpuLayers = actualGpuLayers,
+                useMmap = true
             )
             Log.d("CactusLM", "DEBUGGING: Created CactusInitParams, useMmap = ${params.useMmap}")
             Log.d("CactusLM", "DEBUGGING: useMmap type = ${params.useMmap::class.simpleName}")

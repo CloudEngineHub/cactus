@@ -3,7 +3,8 @@ package com.cactus
 class CactusLM(
     private val threads: Int = 4,
     private val contextSize: Int = 2048,
-    private val batchSize: Int = 512
+    private val batchSize: Int = 512,
+    private val gpuLayers: Int = 0
 ) {
     private var handle: Long? = null
     private var lastDownloadedFilename: String? = null
@@ -21,7 +22,7 @@ class CactusLM(
     }
     
     suspend fun init(filename: String = lastDownloadedFilename ?: "Qwen3-0.6B-Q8_0.gguf"): Boolean {
-        handle = loadModel(filename, threads, contextSize, batchSize)
+        handle = loadModel(filename, threads, contextSize, batchSize, gpuLayers)
         return handle != null
     }
     
@@ -47,6 +48,6 @@ class CactusLM(
 }
 
 expect suspend fun downloadModel(url: String, filename: String): Boolean
-expect suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int): Long?
+expect suspend fun loadModel(path: String, threads: Int, contextSize: Int, batchSize: Int, gpuLayers: Int): Long?
 expect suspend fun generateCompletion(handle: Long, prompt: String, maxTokens: Int, temperature: Float, topP: Float): String?
 expect fun unloadModel(handle: Long) 
