@@ -6,7 +6,7 @@ Run LLMs, VLMs, and TTS models directly on mobile devices.
 
 ```yaml
 dependencies:
-  cactus: ^0.2.0
+  cactus: ^0.2.4
 ```
 
 **Requirements:** iOS 12.0+, Android API 24+, Flutter 3.3.0+

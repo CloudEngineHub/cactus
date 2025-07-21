@@ -7,7 +7,7 @@ Run LLMs, VLMs, and TTS models directly on mobile devices.
 ```json
 {
   "dependencies": {
-    "cactus-react-native": "^0.2.1",
+    "cactus-react-native": "^0.2.4",
     "react-native-fs": "^2.20.0"
   }
 }

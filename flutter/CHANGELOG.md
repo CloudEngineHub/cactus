@@ -1,3 +1,8 @@
+## 0.2.4
+
+* Bugfix
+* Openai Compatible Messaging
+
 ## 0.2.0
 
 * Changed `visionUrl`/`visionFilename` to `mmprojUrl`/`mmprojFilename` in `CactusVLM.init()`
