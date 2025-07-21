@@ -3,15 +3,15 @@ import {
   initMultimodal,
   multimodalCompletion,
   LlamaContext,
+  type ContextParams,
+  type CompletionParams,
+  type CactusOAICompatibleMessage,
+  type NativeCompletionResult,
 } from './index'
-import type {
-  ContextParams,
-  CompletionParams,
-  CactusOAICompatibleMessage,
-  NativeCompletionResult,
-} from './index'
+
 import { Telemetry } from './telemetry'
 import { setCactusToken, getTextCompletion, getVisionCompletion } from './remote'
+import { ConversationHistoryManager } from './chat'
 
 interface CactusVLMReturn {
   vlm: CactusVLM | null
@@ -29,9 +29,11 @@ export type VLMCompletionParams = Omit<CompletionParams, 'prompt'> & {
 
 export class CactusVLM {
   private context: LlamaContext
-  
+  protected conversationHistoryManager: ConversationHistoryManager
+
   private constructor(context: LlamaContext) {
     this.context = context
+    this.conversationHistoryManager = new ConversationHistoryManager()
   }
 
   static async init(
@@ -111,26 +113,47 @@ export class CactusVLM {
     return result;
   }
 
-  private async _handleLocalCompletion(
+  private _handleLocalCompletion = async(
     messages: CactusOAICompatibleMessage[],
     params: VLMCompletionParams,
     callback?: (data: any) => void,
-  ): Promise<NativeCompletionResult> {
+  ): Promise<NativeCompletionResult> => {
+    const { newMessages, requiresReset } =
+      this.conversationHistoryManager.processNewMessages(messages);
+
+    if (requiresReset) {
+      this.context?.rewind();
+      this.conversationHistoryManager.reset();
+    }
+
+    if (newMessages.length === 0) {
+      console.warn('No messages to complete!');
+    }
+
+    let result: NativeCompletionResult;
+
     if (params.images && params.images.length > 0) {
-      const formattedPrompt = await this.context.getFormattedChat(messages)
+      const formattedPrompt = await this.context.getFormattedChat(newMessages)
       const prompt =
         typeof formattedPrompt === 'string'
           ? formattedPrompt
           : formattedPrompt.prompt
-      return await multimodalCompletion(
+      result = await multimodalCompletion(
         this.context.id,
         prompt,
         params.images,
         { ...params, prompt, emit_partial_completion: !!callback },
       )
     } else {
-      return await this.context.completion({ messages, ...params }, callback)
+      result = await this.context.completion({ messages: newMessages, ...params }, callback)
     }
+
+    this.conversationHistoryManager.update(newMessages, {
+      role: 'assistant',
+      content: result.content || result.text,
+    });
+
+    return result;
   }
 
   private async _handleRemoteCompletion(
@@ -181,7 +204,6 @@ export class CactusVLM {
   }
 
   async rewind(): Promise<void> {
-    // @ts-ignore
     return this.context?.rewind()
   }
 

@@ -4,9 +4,11 @@ import './types.dart';
 import './context.dart';
 import './telemetry.dart';
 import './remote.dart';
+import './chat.dart';
 
 class CactusVLM {
   CactusContext? _context;
+  final ConversationHistoryManager _historyManager = ConversationHistoryManager();
   
   CactusVLM._();
 
@@ -109,10 +111,16 @@ class CactusVLM {
     CactusTokenCallback? onToken,
   ) async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
+
+    final processed = _historyManager.processNewMessages(messages);
+    if (processed.requiresReset) {
+      _context!.rewind();
+      _historyManager.reset();
+    }
     
-    return await _context!.completion(
+    final result = await _context!.completion(
       CactusCompletionParams(
-        messages: messages,
+        messages: processed.newMessages,
         maxPredictedTokens: maxTokens,
         temperature: temperature,
         topK: topK,
@@ -122,6 +130,10 @@ class CactusVLM {
       ),
       mediaPaths: imagePaths,
     );
+
+    _historyManager.update(processed.newMessages, ChatMessage(role: 'assistant', content: result.text));
+
+    return result;
   }
 
   Future<CactusCompletionResult> _handleRemoteCompletion(
@@ -204,7 +216,7 @@ class CactusVLM {
 
   Future<void> rewind() async {
     if (_context == null) throw CactusException('CactusVLM not initialized');
-    await _context!.rewind();
+    _context!.rewind();
   }
 
   Future<void> stopCompletion() async {
