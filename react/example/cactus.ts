@@ -140,6 +140,23 @@ class CactusManager {
   getIsInitialized(): boolean {
     return this.isInitialized;
   }
+
+  async stressInitialize(
+    count: number = 10,
+    onProgress: (progress: number) => void = () => {},
+  ): Promise<void> {
+    for (let i = 0; i < count; i++) {
+      console.log(`[Cactus] stress init ${i + 1}/${count} starting`);
+      await this.initialize(onProgress);
+      console.log(`[Cactus] stress init ${i + 1}/${count} finished`);
+      // Release to ensure native memory is freed before the next pass
+      if (this.vlm) {
+        await this.vlm.release();
+      }
+      this.vlm = null;
+      this.isInitialized = false;
+    }
+  }
 }
 
 export const cactus = new CactusManager();

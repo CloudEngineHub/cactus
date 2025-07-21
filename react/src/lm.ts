@@ -1,4 +1,6 @@
 import { initLlama, LlamaContext } from './index'
+// @ts-ignore
+import { Platform } from 'react-native'
 import type {
   ContextParams,
   CompletionParams,

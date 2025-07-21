@@ -307,6 +307,7 @@ Java_com_cactus_LlamaContext_initContext(
     llama->is_load_interrupted = false;
     llama->loading_progress = 0;
 
+    callback_context *cb_ctx = nullptr;
     if (load_progress_callback != nullptr) {
         defaultParams.progress_callback = [](float progress, void * user_data) {
             callback_context *cb_ctx = (callback_context *)user_data;
@@ -323,7 +324,7 @@ Java_com_cactus_LlamaContext_initContext(
             return !llama->is_load_interrupted;
         };
 
-        callback_context *cb_ctx = new callback_context;
+        cb_ctx = new callback_context;
         cb_ctx->env = env;
         cb_ctx->llama = llama;
         cb_ctx->callback = env->NewGlobalRef(load_progress_callback);
@@ -339,19 +340,29 @@ Java_com_cactus_LlamaContext_initContext(
     env->ReleaseStringUTFChars(cache_type_v, cache_type_v_chars);
 
     LOGI("[CACTUS] is_model_loaded %s", (is_model_loaded ? "true" : "false"));
-    if (is_model_loaded) {
-        if (embedding && llama_model_has_encoder(llama->model) && llama_model_has_decoder(llama->model)) {
-            LOGI("[CACTUS] computing embeddings in encoder-decoder models is not supported");
-            llama_free(llama->ctx);
-            return -1;
-        }
-        context_map[(long) llama->ctx] = llama;
-    } else {
-        LOGE("[CACTUS] Failed to load model from path: %s", model_path_chars);
+
+    if (!is_model_loaded) {
         llama_free(llama->ctx);
+        if (cb_ctx) {
+            env->DeleteGlobalRef(cb_ctx->callback);
+            delete cb_ctx;
+        }
         delete llama;
         return -1;
     }
+
+    if (embedding && llama_model_has_encoder(llama->model) && llama_model_has_decoder(llama->model)) {
+        LOGI("[CACTUS] computing embeddings in encoder-decoder models is not supported");
+        llama_free(llama->ctx);
+        if (cb_ctx) {
+            env->DeleteGlobalRef(cb_ctx->callback);
+            delete cb_ctx;
+        }
+        delete llama;
+        return -1;
+    }
+
+    context_map[(long) llama->ctx] = llama;
 
     std::vector<common_adapter_lora_info> lora;
     const char *lora_chars = env->GetStringUTFChars(lora_str, nullptr);
@@ -381,11 +392,20 @@ Java_com_cactus_LlamaContext_initContext(
     env->ReleaseStringUTFChars(lora_str, lora_chars);
     int result = llama->applyLoraAdapters(lora);
     if (result != 0) {
-      LOGE("[CACTUS] Failed to apply lora adapters");
-      llama_free(llama->ctx);
-      context_map.erase((long) llama->ctx);
-      delete llama;
-      return -1;
+        LOGI("[Cactus] Failed to apply lora adapters");
+        context_map.erase((long) llama->ctx);
+        llama_free(llama->ctx);
+        if (cb_ctx) {
+            env->DeleteGlobalRef(cb_ctx->callback);
+            delete cb_ctx;
+        }
+        delete llama;
+        return -1;
+    }
+
+    if (cb_ctx) {
+        env->DeleteGlobalRef(cb_ctx->callback);
+        delete cb_ctx;
     }
 
     return reinterpret_cast<jlong>(llama->ctx);

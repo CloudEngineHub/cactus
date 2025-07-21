@@ -6,6 +6,9 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DRY_RUN=false
 VERBOSE=false
 
+rm -rf ~/Library/Developer/Xcode/DerivedData
+rm -rf ~/.gradle/caches
+
 usage() {
     echo "Usage: $0 [--dry-run] [--verbose] [--help]"
     echo "Clean up all files and folders listed in .gitignore"
