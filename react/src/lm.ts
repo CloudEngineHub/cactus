@@ -7,8 +7,10 @@ import type {
   EmbeddingParams,
   NativeEmbeddingResult,
 } from './index'
+
 import { Telemetry } from './telemetry'
 import { setCactusToken, getVertexAIEmbedding } from './remote'
+import { ConversationHistoryManager } from './chat'
 
 interface CactusLMReturn {
   lm: CactusLM | null
@@ -16,10 +18,12 @@ interface CactusLMReturn {
 }
 
 export class CactusLM {
-  private context: LlamaContext
+  protected context: LlamaContext
+  protected conversationHistoryManager: ConversationHistoryManager
 
-  private constructor(context: LlamaContext) {
+  protected constructor(context: LlamaContext) {
     this.context = context
+    this.conversationHistoryManager = new ConversationHistoryManager()
   }
 
   static async init(
@@ -88,12 +92,31 @@ export class CactusLM {
     return { lm: null, error: new Error('Failed to initialize CactusLM after all retries') };
   }
 
-  async completion(
+  completion = async (
     messages: CactusOAICompatibleMessage[],
     params: CompletionParams = {},
     callback?: (data: any) => void,
-  ): Promise<NativeCompletionResult> {
-    return await this.context.completion({ messages, ...params }, callback);
+  ): Promise<NativeCompletionResult> => {
+    const { newMessages, requiresReset } =
+      this.conversationHistoryManager.processNewMessages(messages);
+
+    if (requiresReset) {
+      this.context?.rewind();
+      this.conversationHistoryManager.reset();
+    }
+
+    if (newMessages.length === 0) {
+      console.warn('No messages to complete!');
+    }
+
+    const result = await this.context.completion({ messages: newMessages, ...params }, callback);
+
+    this.conversationHistoryManager.update(newMessages, {
+      role: 'assistant',
+      content: result.content,
+    });
+
+    return result;
   }
 
   async embedding(
@@ -136,19 +159,18 @@ export class CactusLM {
     return result;
   }
 
-  private async _handleLocalEmbedding(text: string, params?: EmbeddingParams): Promise<NativeEmbeddingResult> {
+  protected async _handleLocalEmbedding(text: string, params?: EmbeddingParams): Promise<NativeEmbeddingResult> {
     return this.context.embedding(text, params);
   }
 
-  private async _handleRemoteEmbedding(text: string): Promise<NativeEmbeddingResult> {
+  protected async _handleRemoteEmbedding(text: string): Promise<NativeEmbeddingResult> {
     const embeddingValues = await getVertexAIEmbedding(text);
     return {
       embedding: embeddingValues,
     };
   }
 
-  async rewind(): Promise<void> {
-    // @ts-ignore
+  rewind = async (): Promise<void> => {
     return this.context?.rewind()
   }
 

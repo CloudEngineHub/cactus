@@ -1,6 +1,7 @@
 import { NativeEventEmitter, DeviceEventEmitter, Platform } from 'react-native'
 import type { DeviceEventEmitterStatic } from 'react-native'
 import Cactus from './NativeCactus'
+
 import type {
   NativeContextParams,
   NativeLlamaContext,
@@ -20,15 +21,13 @@ import type {
   NativeAudioDecodeResult,
   NativeDeviceInfo,
 } from './NativeCactus'
-import type {
-  SchemaGrammarConverterPropOrder,
-  SchemaGrammarConverterBuiltinRule,
-} from './grammar'
-import { SchemaGrammarConverter, convertJsonSchemaToGrammar } from './grammar'
+
+
 import type { CactusMessagePart, CactusOAICompatibleMessage } from './chat'
 import { formatChat } from './chat'
 import { Tools, parseAndExecuteTool } from './tools'
 import { Telemetry, type TelemetryParams } from './telemetry'
+
 export type {
   NativeContextParams,
   NativeLlamaContext,
@@ -45,13 +44,9 @@ export type {
   CactusOAICompatibleMessage,
   JinjaFormattedChatResult,
   NativeAudioDecodeResult,
-
-  // Deprecated
-  SchemaGrammarConverterPropOrder,
-  SchemaGrammarConverterBuiltinRule,
 }
 
-export { SchemaGrammarConverter, convertJsonSchemaToGrammar, Tools }
+export {Tools }
 export * from './remote'
 
 const EVENT_ON_INIT_CONTEXT_PROGRESS = '@Cactus_onInitContextProgress'
@@ -254,7 +249,6 @@ export class LlamaContext {
         return this.completion(params, callback);
     }
     if (recursionCount >= recursionLimit) {
-        // console.log(`Recursion limit reached (${recursionCount}/${recursionLimit}), returning default completion`)
         return this.completion({
             ...params,
             jinja: true, 
@@ -264,14 +258,12 @@ export class LlamaContext {
 
     const messages = [...params.messages]; // avoid mutating the original messages
 
-    // console.log('Calling completion...')
     const result = await this.completion({
         ...params, 
         messages: messages,
         jinja: true, 
         tools: params.tools.getSchemas()
     }, callback);
-    // console.log('Completion result:', result);
     
     const {toolCalled, toolName, toolInput, toolOutput} = 
         await parseAndExecuteTool(result, params.tools);
@@ -293,8 +285,6 @@ export class LlamaContext {
         } as CactusOAICompatibleMessage;
         
         messages.push(toolMessage);
-        
-        // console.log('Messages being sent to next completion:', JSON.stringify(messages, null, 2));
         
         return await this.completionWithTools(
             {...params, messages: messages}, 
@@ -471,8 +461,7 @@ export class LlamaContext {
   }
 
   async rewind(): Promise<void> {
-    // @ts-ignore
-    return (Cactus as any).rewind(this.id)
+    return Cactus.rewind(this.id)
   }
 }
 
