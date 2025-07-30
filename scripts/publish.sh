@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-"$SCRIPT_DIR/build-ios.sh"
+# "$SCRIPT_DIR/build-ios.sh"
 "$SCRIPT_DIR/build-react-android.sh"
 # "$SCRIPT_DIR/build-flutter-android.sh"
 
@@ -21,7 +21,7 @@ npm publish
 
 cd "$ROOT_DIR"
 git add .
-git commit -m "chore: publish"
+git commit -m "publish latest xcframework and jnilibs"
 git push origin main
 
 # cd "$ROOT_DIR/flutter"
