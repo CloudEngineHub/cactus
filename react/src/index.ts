@@ -27,7 +27,6 @@ import type { CactusMessagePart, CactusOAICompatibleMessage } from './chat'
 import { formatChat } from './chat'
 import { Tools, parseAndExecuteTool } from './tools'
 import { Telemetry, type TelemetryParams } from './telemetry'
-
 export type {
   NativeContextParams,
   NativeLlamaContext,
@@ -45,9 +44,11 @@ export type {
   JinjaFormattedChatResult,
   NativeAudioDecodeResult,
 }
-
-export {Tools }
 export * from './remote'
+export {
+  Tools, 
+  parseAndExecuteTool
+} from './tools'
 
 const EVENT_ON_INIT_CONTEXT_PROGRESS = '@Cactus_onInitContextProgress'
 const EVENT_ON_TOKEN = '@Cactus_onToken'
@@ -72,7 +73,6 @@ if (EventEmitter) {
       logListeners.forEach((listener) => listener(evt.level, evt.text))
     },
   )
-  // Trigger unset to use default log callback
   Cactus?.toggleNativeLog?.(false)?.catch?.(() => {})
 }
 
@@ -181,18 +181,12 @@ export class LlamaContext {
     this.model = model
   }
 
-  /**
-   * Load cached prompt & completion state from a file.
-   */
   async loadSession(filepath: string): Promise<NativeSessionLoadResult> {
     let path = filepath
     if (path.startsWith('file://')) path = path.slice(7)
     return Cactus.loadSession(this.id, path)
   }
 
-  /**
-   * Save current cached prompt & completion state to a file.
-   */
   async saveSession(
     filepath: string,
     options?: { tokenSize: number },
@@ -242,10 +236,10 @@ export class LlamaContext {
     recursionCount: number = 0,
     recursionLimit: number = 3
 ): Promise<NativeCompletionResult> {
-    if (!params.messages) { // tool calling only works with messages
+    if (!params.messages) { 
         return this.completion(params, callback);
     }
-    if (!params.tools) { // no tools => default completion
+    if (!params.tools) { 
         return this.completion(params, callback);
     }
     if (recursionCount >= recursionLimit) {
@@ -256,7 +250,7 @@ export class LlamaContext {
         }, callback);
     }
 
-    const messages = [...params.messages]; // avoid mutating the original messages
+    const messages = [...params.messages];
 
     const result = await this.completion({
         ...params, 
@@ -307,7 +301,7 @@ export class LlamaContext {
       emit_partial_completion: !!callback,
     }
     if (params.messages) {
-      // messages always win
+
       const formattedResult = await this.getFormattedChat(
         params.messages,
         params.chat_template || params.chatTemplate,
@@ -502,7 +496,6 @@ export async function loadLlamaModelInfo(model: string): Promise<Object> {
 }
 
 const poolTypeMap = {
-  // -1 is unspecified as undefined
   none: 0,
   mean: 1,
   cls: 2,
@@ -666,3 +659,4 @@ export const getDeviceInfo = async (contextId: number): Promise<NativeDeviceInfo
 export { CactusLM } from './lm';
 export { CactusVLM } from './vlm';
 export { CactusTTS } from './tts';
+export { CactusAgent } from './agent';

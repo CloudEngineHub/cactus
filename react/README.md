@@ -729,6 +729,54 @@ const { lm } = await CactusLM.init({
 });
 ```
 
+## Tool Calling with CactusAgent
+
+The `CactusAgent` class extends `CactusLM` with built-in tool calling capabilities:
+
+```typescript
+import { CactusAgent } from 'cactus-react-native';
+
+const { agent, error } = await CactusAgent.init({
+  model: '/path/to/model.gguf', // we recommend Qwen 3 family, 0.6B is great
+  n_ctx: 2048,
+});
+
+const weatherTool = agent.addTool(
+  (location: string) => `Weather in ${location}: 72°F, sunny`,
+  'Get current weather for a location',
+  {
+    location: { type: 'string', description: 'City name', required: true }
+  }
+);
+
+const messages = [{ role: 'user', content: 'What\'s the weather in NYC?' }];
+const result = await agent.completionWithTools(messages, {
+  n_predict: 200,
+  temperature: 0.7,
+});
+
+await agent.release();
+```
+
+### Custom Tools
+
+```typescript
+// Math calculator tool
+const calculator = agent.addTool(
+  (expression: string) => {
+    try {
+      return `Result: ${eval(expression)}`;
+    } catch (e) {
+      return 'Invalid expression';
+    }
+  },
+  'Evaluate mathematical expressions',
+  {
+    expression: { type: 'string', description: 'Math expression to evaluate', required: true }
+  }
+);
+```
+
 ## API Reference
 
 ### CactusLM
