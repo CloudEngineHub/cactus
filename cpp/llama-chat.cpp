@@ -159,7 +159,6 @@ llm_chat_template llm_chat_detect_template(const std::string & tmpl) {
         // chatglm3-6b
         return LLM_CHAT_TEMPLATE_CHATGLM_3;
     } else if (tmpl_contains(reinterpret_cast<const char*>(u8"<用户>"))) {
-    } else if (tmpl_contains(reinterpret_cast<const char*>(u8"<用户>"))) {
         // MiniCPM-3B-OpenHermes-2.5-v2-GGUF
         return LLM_CHAT_TEMPLATE_MINICPM;
     } else if (tmpl_contains("'Assistant: ' + message['content'] + eos_token")) {
