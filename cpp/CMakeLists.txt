@@ -124,56 +124,56 @@ if(APPLE)
 endif()
 
 if (MSVC)
-	target_compile_definitions(cactus_core_lib PUBLIC
-		_CRT_SECURE_NO_DEPRECATE
-		_USE_MATH_DEFINES
-	)
-	
-	# Create a static library from the object files
-    add_library(cactus_core_static STATIC $<TARGET_OBJECTS:cactus_core_lib>)
-    target_include_directories(cactus_core_static PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/minja>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/mtmd>
-    )
+target_compile_definitions(cactus_core_lib PUBLIC
+	_CRT_SECURE_NO_DEPRECATE
+	_USE_MATH_DEFINES
+)
 
-    install(TARGETS cactus_core_static
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin
-    )
+# Create a static library from the object files
+add_library(cactus_core_static STATIC $<TARGET_OBJECTS:cactus_core_lib>)
+target_include_directories(cactus_core_static PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/minja>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools/mtmd>
+)
 
-    # Install headers, excluding build, example, and patches
-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-        DESTINATION include
-        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-        PATTERN "build" EXCLUDE
-        PATTERN "example" EXCLUDE
-        PATTERN "patches" EXCLUDE
-    )
-	
-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu/
-        DESTINATION include/ggml-cpu
-        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-        PATTERN "build" EXCLUDE
-        PATTERN "example" EXCLUDE
-        PATTERN "patches" EXCLUDE
-    )
-	
-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/minja/
-        DESTINATION include/minja
-        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-        PATTERN "build" EXCLUDE
-        PATTERN "example" EXCLUDE
-        PATTERN "patches" EXCLUDE
-    )
-	
-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tools/mtmd/
-        DESTINATION include/tools/mtmd
-        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-        PATTERN "build" EXCLUDE
-        PATTERN "example" EXCLUDE
-        PATTERN "patches" EXCLUDE
-    )
+install(TARGETS cactus_core_static
+	ARCHIVE DESTINATION lib
+	LIBRARY DESTINATION lib
+	RUNTIME DESTINATION bin
+)
+
+# Install headers, excluding build, example, and patches
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+	DESTINATION include
+	FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+	PATTERN "build" EXCLUDE
+	PATTERN "example" EXCLUDE
+	PATTERN "patches" EXCLUDE
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu/
+	DESTINATION include/ggml-cpu
+	FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+	PATTERN "build" EXCLUDE
+	PATTERN "example" EXCLUDE
+	PATTERN "patches" EXCLUDE
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/minja/
+	DESTINATION include/minja
+	FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+	PATTERN "build" EXCLUDE
+	PATTERN "example" EXCLUDE
+	PATTERN "patches" EXCLUDE
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tools/mtmd/
+	DESTINATION include/tools/mtmd
+	FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+	PATTERN "build" EXCLUDE
+	PATTERN "example" EXCLUDE
+	PATTERN "patches" EXCLUDE
+)
 endif()
