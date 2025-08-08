@@ -22,6 +22,7 @@ add_executable(cactus_embed main_embed.cpp)
 add_executable(cactus_llm main_llm.cpp)
 add_executable(cactus_tts main_tts.cpp)
 add_executable(cactus_conversation_ffi main_conversation_ffi.cpp)
+add_executable(cactus_debug main_debug.cpp)
 
 # Link each executable to the core library
 target_link_libraries(cactus_vlm PRIVATE cactus_core_lib)
@@ -30,3 +31,4 @@ target_link_libraries(cactus_embed PRIVATE cactus_core_lib)
 target_link_libraries(cactus_llm PRIVATE cactus_core_lib)
 target_link_libraries(cactus_tts PRIVATE cactus_core_lib)
 target_link_libraries(cactus_conversation_ffi PRIVATE cactus_core_lib)
+target_link_libraries(cactus_debug PRIVATE cactus_core_lib)
