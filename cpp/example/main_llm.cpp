@@ -143,8 +143,8 @@ void runConversationDemo(cactus::cactus_context& context) {
 }
 
 int main(int argc, char **argv) {
-    const std::string model_url = "https://huggingface.co/QuantFactory/SmolLM-360M-Instruct-GGUF/resolve/main/SmolLM-360M-Instruct.Q6_K.gguf";
-    const std::string model_filename = "SmolLM-360M-Instruct.Q6_K.gguf";
+    const std::string model_url = "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf?download=true";
+    const std::string model_filename = "Qwen3-0.6B-Q8_0.gguf";
     
     if (!downloadFile(model_url, model_filename, "LLM model")) {
         return 1;
