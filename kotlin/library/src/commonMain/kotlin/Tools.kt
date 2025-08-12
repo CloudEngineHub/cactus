@@ -2,6 +2,15 @@ package com.cactus
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class Parameter(
@@ -98,12 +107,13 @@ data class ToolCallResult(
 @Serializable
 data class ModelToolCall(
     val name: String,
-    val arguments: Map<String, String>
+    val arguments: Map<String, JsonElement>
 )
 
 @Serializable
 data class ModelResponse(
-    val tool_calls: List<ModelToolCall>? = null
+    val tool_calls: List<ModelToolCall>? = null,
+    val tool_call: List<ModelToolCall>? = null
 )
 
 suspend fun parseAndExecuteTool(
@@ -122,18 +132,31 @@ suspend fun parseAndExecuteTool(
         for (jsonBlock in possibleJsonBlocks) {
             try {
                 val response = json.decodeFromString<ModelResponse>(jsonBlock)
-                
+
                 if (!response.tool_calls.isNullOrEmpty()) {
                     val toolCall = response.tool_calls.first()
                     val toolName = toolCall.name
-                    val toolInput = toolCall.arguments
+                    val toolInput = convertJsonElementsToAny(toolCall.arguments)
 
                     val toolOutput = tools.execute(toolName, toolInput)
 
                     return ToolCallResult(
                         toolCalled = true,
                         toolName = toolName,
-                        toolInput = toolInput,
+                        toolInput = toolInput.mapValues { it.value.toString() },
+                        toolOutput = toolOutput.toString()
+                    )
+                } else if (!response.tool_call.isNullOrEmpty()) {
+                    val toolCall = response.tool_call.first()
+                    val toolName = toolCall.name
+                    val toolInput = convertJsonElementsToAny(toolCall.arguments)
+
+                    val toolOutput = tools.execute(toolName, toolInput)
+
+                    return ToolCallResult(
+                        toolCalled = true,
+                        toolName = toolName,
+                        toolInput = toolInput.mapValues { it.value.toString() },
                         toolOutput = toolOutput.toString()
                     )
                 }
@@ -151,7 +174,7 @@ suspend fun parseAndExecuteTool(
 private fun extractJsonBlocks(response: String): List<String> {
     val jsonBlocks = mutableListOf<String>()
 
-    if (response.contains("\"tool_calls\"")) {
+    if (response.contains("\"tool_calls\"") || response.contains("\"tool_call\"")) {
         var braceCount = 0
         var startIndex = -1
         var endIndex = -1
@@ -167,7 +190,8 @@ private fun extractJsonBlocks(response: String): List<String> {
                     if (braceCount == 0 && startIndex != -1) {
                         endIndex = i
                         val candidate = response.substring(startIndex, endIndex + 1)
-                        if (candidate.contains("\"tool_calls\"") && !jsonBlocks.contains(candidate)) {
+                        if ((candidate.contains("\"tool_calls\"") || candidate.contains("\"tool_call\""))
+                            && !jsonBlocks.contains(candidate)) {
                             jsonBlocks.add(candidate)
                         }
                         startIndex = -1
@@ -178,4 +202,25 @@ private fun extractJsonBlocks(response: String): List<String> {
     }
 
     return jsonBlocks
+}
+
+private fun convertJsonElementsToAny(jsonElements: Map<String, JsonElement>): Map<String, Any> {
+    return jsonElements.mapValues { (_, jsonElement) ->
+        convertJsonElementToAny(jsonElement)
+    }
+}
+
+private fun convertJsonElementToAny(jsonElement: JsonElement): Any {
+    if (jsonElement !is JsonPrimitive) {
+        return jsonElement.toString()
+    }
+
+    val primitive = jsonElement.jsonPrimitive
+
+    return when {
+        primitive.booleanOrNull != null -> primitive.boolean
+        primitive.intOrNull != null -> primitive.int
+        primitive.doubleOrNull != null -> primitive.double
+        else -> primitive.content
+    }
 }
