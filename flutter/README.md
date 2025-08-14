@@ -137,6 +137,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+```
+
 ## Core APIs
 
 ### CactusLM (Language Model)
