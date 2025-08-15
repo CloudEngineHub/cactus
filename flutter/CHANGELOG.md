@@ -1,3 +1,9 @@
+## 0.2.7
+
+* Agents capable of phone tool use
+8 Gemma3 270m support
+* Separare model download as a separate function
+
 ## 0.2.4
 
 * Bugfix
