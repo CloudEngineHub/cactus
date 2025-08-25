@@ -589,15 +589,6 @@ export default function VisionChat() {
 ### Cloud Fallback
 
 ```typescript
-const { lm } = await CactusLM.init({
-  model: '/path/to/model.gguf',
-  n_ctx: 2048,
-}, undefined, 'your_cactus_token');
-
-// Try local first, fallback to cloud if local fails
-const embedding = await lm.embedding('text', undefined, 'localfirst');
-
-// Vision models also support cloud fallback
 const { vlm } = await CactusVLM.init({
   model: '/path/to/model.gguf',
   mmproj: '/path/to/mmproj.gguf',
@@ -605,7 +596,7 @@ const { vlm } = await CactusVLM.init({
 
 const result = await vlm.completion(messages, {
   images: ['/path/to/image.jpg'],
-  mode: 'localfirst',
+  mode: 'localfirst', // ("remotefirst", "local", "remote")
 });
 ```
 
