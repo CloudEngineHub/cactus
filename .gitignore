@@ -25,55 +25,6 @@ local.properties
 .settings/
 captures/
 
-# === Node.js & Web ===
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-.npm
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
-package-lock.json
-yarn.lock
-**/doc/api/
-
-# === React/Expo ===
-.expo/
-.expo-shared/
-dist/
-web-build/
-coverage/
-.env
-.env.*
-*.tsbuildinfo
-react/lib/
-
-# === Node/React Native ===
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-yarn.lock
-.env
-.env.*
-.expo/
-dist/
-build/
-coverage/*
-*.tsbuildinfo
-react/lib/
-react/ios/cactus.xcframework/
-react/ios/cactus.xcodeproj/
-react/ios/CMakelists.txt
-react/android/src/main/jniLibs/
-react/example/ios/
-react/example/android/
-
 # === Android ===
 android/src/main/jniLibs
 
@@ -87,11 +38,6 @@ kotlin/example/iosApp/Frameworks
 kotlin/example/iosApp/iosApp.xcodeproj/Frameworks
 kotlin/library/src/commonMain/resources/ios/cactus.xcframework
 kotlin/library/src/commonMain/resources/android/jniLibs
-
-# === Metro/React Native cache ===
-.cache/
-react-native-packager-cache-*/
-__generated__/
 
 # === iOS ===
 ios/Pods/
