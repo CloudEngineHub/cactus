@@ -27,7 +27,6 @@ function build_framework() {
 
   cd "$5"
 
-  # Configure CMake
   cmake "$ROOT_DIR/ios" \
     -GXcode \
     -DCMAKE_SYSTEM_NAME=$1 \
@@ -37,10 +36,8 @@ function build_framework() {
     -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
     -DCMAKE_IOS_INSTALL_COMBINED=YES
 
-  # Build
   cmake --build . --config Release -j $(sysctl -n hw.logicalcpu)
 
-  # Setup framework directory
   DEST_DIR="$ROOT_DIR/ios/cactus.xcframework/$4"
   FRAMEWORK_SRC="Release-$3/cactus.framework"
   FRAMEWORK_DEST="$DEST_DIR/cactus.framework"
@@ -48,7 +45,6 @@ function build_framework() {
   rm -rf "$DEST_DIR"
   mkdir -p "$DEST_DIR"
 
-  # Copy the built framework to the destination
   if [ -d "$FRAMEWORK_SRC" ]; then
     cp -R "$FRAMEWORK_SRC" "$FRAMEWORK_DEST"
   else
@@ -58,7 +54,6 @@ function build_framework() {
 
   mkdir -p "$FRAMEWORK_DEST/Headers"
 
-  # Copy headers and metallib
   cp_headers $4
   if [[ "$4" == *"-simulator" ]]; then
     cp "$ROOT_DIR/cpp/ggml-llama-sim.metallib" "$FRAMEWORK_DEST/ggml-llama-sim.metallib"
@@ -76,7 +71,6 @@ t0=$(date +%s)
 rm -rf build-ios
 mkdir -p build-ios
 
-# Build iOS frameworks
 build_framework "iOS" "arm64;x86_64" "iphonesimulator" "ios-arm64_x86_64-simulator" "build-ios"
 build_framework "iOS" "arm64" "iphoneos" "ios-arm64" "build-ios"
 rm -rf build-ios
@@ -84,7 +78,6 @@ rm -rf build-ios
 rm -rf build-tvos
 mkdir -p build-tvos
 
-# Build tvOS frameworks
 build_framework "tvOS" "arm64;x86_64" "appletvsimulator" "tvos-arm64_x86_64-simulator" "build-tvos"
 build_framework "tvOS" "arm64" "appletvos" "tvos-arm64" "build-tvos"
 rm -rf build-tvos

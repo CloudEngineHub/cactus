@@ -74,27 +74,8 @@ react/android/src/main/jniLibs/
 react/example/ios/
 react/example/android/
 
-
-
-# === Flutter/Dart ===
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-**/build/
-**/ios/Flutter/.last_build_id
-flutter/lib/src/types.g.dart
-flutter/pubspec.lock
-lib/generated_plugin_registrant.dart
-app.*.symbols
-app.*.map.json
-pubspec.lock
-flutter/ios/cactus.xcframework
-flutter/android/src/main/jniLibs
-flutter/example/android 
-flutter/example/ios
+# === Android ===
+android/src/main/jniLibs
 
 # === Kotlin ===
 .gradle/
@@ -128,8 +109,6 @@ ios/.bundle/
 *.mode2v3
 *.perspectivev3
 xcuserdata
-
-# iOS Framework binaries
 *.framework/cactus
 *.framework/ggml-llama.metallib
 *.framework/ggml-llama-sim.metallib
