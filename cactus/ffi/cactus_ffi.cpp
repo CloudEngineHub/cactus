@@ -159,6 +159,65 @@ static std::unordered_set<uint32_t> get_stop_tokens(CactusModel* wrapper, const 
     return stop_tokens;
 }
 
+std::vector<ChatMessage> add_tools_json_to_messages(const std::vector<ChatMessage>& messages, const char* tools_json_json) {
+    if (!tools_json_json || strlen(tools_json_json) == 0) {
+        return messages;
+    }
+    
+    try {
+        // Parse the tools_json JSON
+        std::string tools_json_str(tools_json_json);
+        
+        // Create the system message with tools_json
+        std::string system_content = "You are a helpful assistant with access to the following tools_json:\n\n";
+        system_content += tools_json_str;
+        system_content += "\n\nWhen you need to use a tool, respond with a JSON object in this format:\n";
+        system_content += "{\n";
+        system_content += "  \"tool_calls\": [\n";
+        system_content += "    {\n";
+        system_content += "      \"name\": \"tool_name\",\n";
+        system_content += "      \"arguments\": {\n";
+        system_content += "        \"parameter\": \"value\"\n";
+        system_content += "      }\n";
+        system_content += "    }\n";
+        system_content += "  ]\n";
+        system_content += "}\n\n";
+        system_content += "Only use tools_json when necessary to answer the user's request. If you don't need tools_json, respond normally.";
+        
+        ChatMessage system_message;
+        system_message.role = "system";
+        system_message.content = system_content;
+        
+        std::vector<ChatMessage> result;
+        
+        // Check if there's already a system message
+        bool has_system = !messages.empty() && messages[0].role == "system";
+        
+        if (has_system) {
+            // Replace the existing system message
+            result.push_back(system_message);
+            // Add the rest of the messages
+            for (size_t i = 1; i < messages.size(); i++) {
+                result.push_back(messages[i]);
+            }
+        } else {
+            // Add system message at the beginning
+            result.push_back(system_message);
+            // Add all original messages
+            for (const auto& msg : messages) {
+                result.push_back(msg);
+            }
+        }
+        
+        return result;
+        
+    } catch (const std::exception& e) {
+        // If there's an error parsing tools_json, just return original messages
+        std::cerr << "Error processing tools_json: " << e.what() << std::endl;
+        return messages;
+    }
+}
+
 extern "C" {
 
 static std::string last_error_message;
@@ -204,6 +263,7 @@ int cactus_complete(
     char* response_buffer,
     size_t buffer_size,
     const char* options_json,
+    const char* tools_json,
     cactus_token_callback callback,
     void* user_data
 ) {
@@ -244,6 +304,11 @@ int cactus_complete(
             std::string error_json = "{\"success\":false,\"error\":\"No messages provided\"}";
             std::strcpy(response_buffer, error_json.c_str());
             return -1;
+        }
+        
+        // Process tools_json if provided
+        if (tools_json && strlen(tools_json) > 0) {
+            messages = add_tools_json_to_messages(messages, tools_json);
         }
         
         float temperature, top_p;

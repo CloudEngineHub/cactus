@@ -58,7 +58,7 @@ bool test_ffi() {
 
     std::cout << "\n=== Streaming ===" << std::endl;
     int result = cactus_complete(model, messages, response, sizeof(response), options, 
-                                streaming_callback, &stream_data);
+                                nullptr, streaming_callback, &stream_data);
     
     std::cout << "\n=== End of Stream ===\n" << std::endl;
     std::cout << "Final Response JSON:\n" << response << "\n" << std::endl;
@@ -167,7 +167,7 @@ bool test_generation_control() {
     };
     
     int result = cactus_complete(model, messages, response, sizeof(response), 
-                                options, control_callback, &control_data);
+                                options, nullptr, control_callback, &control_data);
     
     std::cout << "\n[Test complete]" << std::endl;
     std::cout << "Generated " << control_data.token_count << " tokens" << std::endl;
@@ -202,7 +202,7 @@ bool test_incremental_processing() {
     })";
     
     std::cout << "\n=== Incremental Processing Test ===" << std::endl;
-    int result1 = cactus_complete(model, first_messages, response1, sizeof(response1), options, nullptr, nullptr);
+    int result1 = cactus_complete(model, first_messages, response1, sizeof(response1), options, nullptr, nullptr, nullptr);
     std::cout << "Response 1: " << response1 << "\n" << std::endl;
     
     const char* second_messages = R"([
@@ -212,7 +212,7 @@ bool test_incremental_processing() {
         {"role": "user", "content": "What is my name?"}
     ])";
     
-    int result2 = cactus_complete(model, second_messages, response2, sizeof(response2), options, nullptr, nullptr);
+    int result2 = cactus_complete(model, second_messages, response2, sizeof(response2), options, nullptr, nullptr, nullptr);
     std::cout << "Response 2: " << response2 << "\n" << std::endl;
     
     cactus_destroy(model);
