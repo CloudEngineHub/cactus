@@ -1,6 +1,10 @@
 <img src="assets/banner.jpg" alt="Logo" style="border-radius: 30px; width: 100%;">
 
-Energy-efficient AI inference framework & kernels for phones & AI-native hardware. Budget and mid-range phones control over 70% of the market, but frameworks today optimise for the highend phones with advanced chips. Cactus is designed bottom-up with no dependencies for all mobile devices. 
+Energy-efficient AI inference framework & kernels for phones & AI-native hardware. 
+
+Budget and mid-range phones control over 70% of the market, but frameworks today optimise for the high-end phones with advanced chips. 
+
+Cactus is designed bottom-up with no dependencies for all mobile devices. 
 
 Example (CPU-only): 
 - Model: Qwen3-600m-INT8
@@ -55,7 +59,7 @@ graph.hard_reset();
 
 ```
 
-Cactus Engine is an transformer inference engine built on top of Cactus Graphs.
+Cactus Engine is a transformer inference engine built on top of Cactus Graphs.
 It is abstracted via the minimalist Cactus Foreign Function Interface.
 
 ```cpp
@@ -106,7 +110,7 @@ int result = cactus_complete(model, messages, response, sizeof(response), option
 ```
 
 This makes it easy to write Cactus bindings for any language. 
-Header files are self-documenting for each but documentation contributions are welcome.
+Header files are self-documenting, but documentation contributions are welcome.
 
 ## Using Cactus in your apps
 Cactus SDKs run 500k+ weekly inference tasks in production today, try them!
@@ -134,9 +138,11 @@ Cactus SDKs run 500k+ weekly inference tasks in production today, try them!
 </a>
 
 ## Contributing or Using the Repo
-You can run these codes directly on Macbooks with Apple chips due to their design.
-Performance gain is observed in mobile devices but for testing during development,
-Vanilla M3 CPU-only can run Qwen3-600m-INT8 at 60-70 toks/sec, use the following: 
+You can run the c++ code directly on any Mac with an Apple chip thanks to the shared design. 
+
+We see optimal performance gains on mobile devices, however for testing during development, a Vanilla M3 CPU-only can run Qwen3-600m-INT8 at 60-70 toks/sec. 
+
+Follow the steps below:
 
 1. **Generate weights from HuggingFace model:**
 ```bash
@@ -146,7 +152,6 @@ python3 tools/convert_hf.py Qwen/Qwen3-0.6B weights/qwen3-600m-i8/ --precision I
 2. **Build and test:**
 ```bash
 ./tests/run.sh # remember to chmod +x any script first time
-
 ```
 
 ## Roadmap:
