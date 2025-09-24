@@ -171,6 +171,15 @@ def convert_hf_model_weights(model, output_dir, precision='INT8', args=None):
     
     tie_word_embeddings = getattr(config, 'tie_word_embeddings', False)
     
+    model_type_str = getattr(config, 'model_type', '').lower()
+    if 'gemma' in model_type_str:
+        detected_model_type = 'gemma'
+    elif 'qwen' in model_type_str:
+        detected_model_type = 'qwen'
+    else:
+        detected_model_type = 'qwen'
+        print(f"  Warning: Unknown model type '{model_type_str}', defaulting to 'qwen'")
+
     model_config = {
         'vocab_size': getattr(config, 'vocab_size', 0),
         'hidden_dim': getattr(config, 'hidden_size', 0),
@@ -181,7 +190,8 @@ def convert_hf_model_weights(model, output_dir, precision='INT8', args=None):
         'context_length': getattr(config, 'max_position_embeddings', getattr(config, 'max_sequence_length', 0)),
         'rope_theta': getattr(config, 'rope_theta', 10000.0),
         'attention_head_dim': getattr(config, 'head_dim', getattr(config, 'hidden_size', 0) // getattr(config, 'num_attention_heads', 1)),
-        'tie_word_embeddings': tie_word_embeddings
+        'tie_word_embeddings': tie_word_embeddings,
+        'model_type': detected_model_type
     }
     
     embed_names = ['model.embed_tokens.weight', 'embed_tokens.weight', 'embeddings.weight', 'transformer.wte.weight']
@@ -190,6 +200,16 @@ def convert_hf_model_weights(model, output_dir, precision='INT8', args=None):
     for name in embed_names:
         if name in state_dict:
             embedding_tensor = state_dict[name]
+
+            model_type = getattr(config, 'model_type', '')
+            if 'gemma' in model_type.lower():
+                hidden_size = getattr(config, 'hidden_size', 0)
+                if hidden_size > 0:
+                    import torch
+                    embed_scale = torch.tensor(hidden_size ** 0.5)
+                    print(f"  Note: Applying Gemma embedding scale factor: {embed_scale:.4f}")
+                    embedding_tensor = embedding_tensor * embed_scale
+
             save_tensor_with_header(embedding_tensor, output_dir / "token_embeddings.weights", precision, transpose=False, stats_tracker=quantization_stats, args=args)
             embedding_found = True
             break
