@@ -153,11 +153,69 @@ void cactus_gelu_f32(const float* input, float* output, size_t num_elements) {
         });
 }
 
+void cactus_gelu_f16(const __fp16* input, __fp16* output, size_t num_elements) {
+    const float sqrt_2_over_pi = 0.7978845608028654f;
+    const float coeff = 0.044715f;
+
+    CactusThreading::parallel_for(num_elements, CactusThreading::Thresholds::SCALAR_EXPENSIVE,
+        [&](size_t start_idx, size_t end_idx) {
+            constexpr size_t SIMD_WIDTH = 8;
+            const size_t vectorized_end = start_idx + ((end_idx - start_idx) / SIMD_WIDTH) * SIMD_WIDTH;
+
+            const float32x4_t half = vdupq_n_f32(0.5f);
+            const float32x4_t one = vdupq_n_f32(1.0f);
+            const float32x4_t sqrt_2_pi_vec = vdupq_n_f32(sqrt_2_over_pi);
+            const float32x4_t coeff_vec = vdupq_n_f32(coeff);
+
+            for (size_t i = start_idx; i < vectorized_end; i += SIMD_WIDTH) {
+                float16x8_t x_f16 = vld1q_f16(&input[i]);
+
+                float32x4_t x_low = vcvt_f32_f16(vget_low_f16(x_f16));
+                float32x4_t x_high = vcvt_f32_f16(vget_high_f16(x_f16));
+
+                float32x4_t x_cubed_low = vmulq_f32(vmulq_f32(x_low, x_low), x_low);
+                float32x4_t x_cubed_high = vmulq_f32(vmulq_f32(x_high, x_high), x_high);
+
+                float32x4_t inner_low = vmlaq_f32(x_low, coeff_vec, x_cubed_low);
+                float32x4_t inner_high = vmlaq_f32(x_high, coeff_vec, x_cubed_high);
+                inner_low = vmulq_f32(sqrt_2_pi_vec, inner_low);
+                inner_high = vmulq_f32(sqrt_2_pi_vec, inner_high);
+
+                float tanh_vals[8];
+                vst1q_f32(&tanh_vals[0], inner_low);
+                vst1q_f32(&tanh_vals[4], inner_high);
+                for (int j = 0; j < 8; j++) {
+                    tanh_vals[j] = tanhf(tanh_vals[j]);
+                }
+                float32x4_t tanh_low = vld1q_f32(&tanh_vals[0]);
+                float32x4_t tanh_high = vld1q_f32(&tanh_vals[4]);
+
+                float32x4_t one_plus_tanh_low = vaddq_f32(one, tanh_low);
+                float32x4_t one_plus_tanh_high = vaddq_f32(one, tanh_high);
+                float32x4_t gelu_low = vmulq_f32(vmulq_f32(half, x_low), one_plus_tanh_low);
+                float32x4_t gelu_high = vmulq_f32(vmulq_f32(half, x_high), one_plus_tanh_high);
+
+                float16x4_t gelu_low_f16 = vcvt_f16_f32(gelu_low);
+                float16x4_t gelu_high_f16 = vcvt_f16_f32(gelu_high);
+                float16x8_t gelu_f16 = vcombine_f16(gelu_low_f16, gelu_high_f16);
+
+                vst1q_f16(&output[i], gelu_f16);
+            }
+
+            for (size_t i = vectorized_end; i < end_idx; ++i) {
+                float x = static_cast<float>(input[i]);
+                float inner = sqrt_2_over_pi * (x + coeff * x * x * x);
+                float gelu = 0.5f * x * (1.0f + tanhf(inner));
+                output[i] = static_cast<__fp16>(gelu);
+            }
+        });
+}
+
 void cactus_gelu_int8(const int8_t* input, int8_t* output, size_t num_elements,
                       float input_scale, float output_scale) {
     const float sqrt_2_over_pi = 0.7978845608028654f;
     const float coeff = 0.044715f;
-    
+
     CactusThreading::parallel_for(num_elements, CactusThreading::Thresholds::SCALAR_EXPENSIVE,
         [&](size_t start_idx, size_t end_idx) {
             for (size_t i = start_idx; i < end_idx; ++i) {

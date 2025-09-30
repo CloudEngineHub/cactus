@@ -9,7 +9,40 @@ namespace engine {
 
 GemmaModel::GemmaModel() : Model() {}
 
-GemmaModel::GemmaModel(const Config& config) : Model(config) {}
+GemmaModel::GemmaModel(const Config& config) : Model(config) {
+    weight_nodes_.layers.resize(config.num_layers);
+}
+
+void GemmaModel::load_weights_to_graph(CactusGraph* gb) {
+    embedding_node_id_ = gb->mmap_embeddings(embedding_file_path_);
+    weight_nodes_.output_norm_weight = gb->mmap_weights(model_folder_path_ + "/output_norm.weights");
+
+    if (config_.tie_word_embeddings) {
+        weight_nodes_.output_weight = embedding_node_id_;
+        output_weight_node_id_ = embedding_node_id_;
+    } else {
+        weight_nodes_.output_weight = gb->mmap_weights(model_folder_path_ + "/output_weight.weights");
+        output_weight_node_id_ = weight_nodes_.output_weight;
+    }
+
+    for (uint32_t i = 0; i < config_.num_layers; i++) {
+        auto& layer = weight_nodes_.layers[i];
+        std::string layer_prefix = model_folder_path_ + "/layer_" + std::to_string(i) + "_";
+        layer.attn_q_weight = gb->mmap_weights(layer_prefix + "attn_q.weights");
+        layer.attn_k_weight = gb->mmap_weights(layer_prefix + "attn_k.weights");
+        layer.attn_v_weight = gb->mmap_weights(layer_prefix + "attn_v.weights");
+        layer.attn_output_weight = gb->mmap_weights(layer_prefix + "attn_output.weights");
+        layer.input_layernorm_weight = gb->mmap_weights(layer_prefix + "input_norm.weights");
+        layer.attn_q_norm_weight = gb->mmap_weights(layer_prefix + "attn_q_norm.weights");
+        layer.attn_k_norm_weight = gb->mmap_weights(layer_prefix + "attn_k_norm.weights");
+        layer.ffn_gate_weight = gb->mmap_weights(layer_prefix + "ffn_gate.weights");
+        layer.ffn_up_weight = gb->mmap_weights(layer_prefix + "ffn_up.weights");
+        layer.ffn_down_weight = gb->mmap_weights(layer_prefix + "ffn_down.weights");
+        layer.post_attention_layernorm_weight = gb->mmap_weights(layer_prefix + "post_attn_norm.weights");
+        layer.pre_feedforward_layernorm_weight = gb->mmap_weights(layer_prefix + "pre_ffn_norm.weights");
+        layer.post_feedforward_layernorm_weight = gb->mmap_weights(layer_prefix + "post_ffn_norm.weights");
+    }
+}
 
 size_t GemmaModel::build_attention(CactusGraph* gb, size_t normalized_input, uint32_t layer_idx,
                                  ComputeBackend backend, bool use_cache, size_t position_offset) {
@@ -39,8 +72,11 @@ size_t GemmaModel::build_attention(CactusGraph* gb, size_t normalized_input, uin
     auto v_proj_4d = gb->reshape(v_proj, {1, seq_len, config_.attention_kv_heads, config_.attention_head_dim});
 
     if (config_.rope_theta > 0) {
-        q_proj_4d = gb->rope(q_proj_4d, config_.rope_theta, position_offset);
-        k_proj_4d = gb->rope(k_proj_4d, config_.rope_theta, position_offset);
+        bool is_global_attention = ((layer_idx + 1) % 6) == 0;
+        float rope_freq = is_global_attention ? 1000000.0f : 10000.0f;
+
+        q_proj_4d = gb->rope(q_proj_4d, rope_freq, position_offset);
+        k_proj_4d = gb->rope(k_proj_4d, rope_freq, position_offset);
     }
 
     size_t final_k = k_proj_4d;
@@ -83,25 +119,32 @@ size_t GemmaModel::build_attention(CactusGraph* gb, size_t normalized_input, uin
 }
 
 
-size_t GemmaModel::build_mlp(CactusGraph* gb, size_t normalized_h, uint32_t layer_idx,
+size_t GemmaModel::build_mlp(CactusGraph* gb, size_t input, uint32_t layer_idx,
                            ComputeBackend backend) const {
     const auto& layer = weight_nodes_.layers[layer_idx];
-    size_t gate_output = gb->matmul(normalized_h, layer.ffn_gate_weight, true, backend);
-    size_t up_output = gb->matmul(normalized_h, layer.ffn_up_weight, true, backend);
-    size_t gate_silu = gb->silu(gate_output);
-    size_t gated = gb->multiply(gate_silu, up_output);
+
+    size_t gate_output = gb->matmul(input, layer.ffn_gate_weight, true, backend);
+    size_t up_output = gb->matmul(input, layer.ffn_up_weight, true, backend);
+    size_t gate_gelu = gb->gelu(gate_output);
+    size_t gated = gb->multiply(gate_gelu, up_output);
     return gb->matmul(gated, layer.ffn_down_weight, true, backend);
 }
 
 size_t GemmaModel::build_transformer_block(CactusGraph* gb, size_t hidden, uint32_t layer_idx,
                                          ComputeBackend backend, bool use_cache, size_t position_offset) {
     const auto& layer = weight_nodes_.layers[layer_idx];
+
     auto normalized_input = gb->rms_norm(hidden, layer.input_layernorm_weight, config_.layer_norm_eps);
     auto attn_output = build_attention(gb, normalized_input, layer_idx, backend, use_cache, position_offset);
-    auto after_attention = gb->add(hidden, attn_output);
-    auto normalized_after_attention = gb->rms_norm(after_attention, layer.post_attention_layernorm_weight, config_.layer_norm_eps);
-    auto mlp_output = build_mlp(gb, normalized_after_attention, layer_idx, backend);
-    return gb->add(after_attention, mlp_output);
+
+    auto normalized_attn = gb->rms_norm(attn_output, layer.post_attention_layernorm_weight, config_.layer_norm_eps);
+    auto after_attention = gb->add(hidden, normalized_attn);
+
+    auto pre_mlp_norm = gb->rms_norm(after_attention, layer.pre_feedforward_layernorm_weight, config_.layer_norm_eps);
+    auto mlp_output = build_mlp(gb, pre_mlp_norm, layer_idx, backend);
+
+    auto normalized_mlp = gb->rms_norm(mlp_output, layer.post_feedforward_layernorm_weight, config_.layer_norm_eps);
+    return gb->add(after_attention, normalized_mlp);
 }
 
 
@@ -127,6 +170,9 @@ size_t GemmaModel::forward(const std::vector<uint32_t>& tokens, bool use_cache) 
 
     auto input_node_id = gb->input({seq_len}, Precision::FP32);
     auto hidden = gb->embedding(embedding_node_id_, input_node_id);
+
+    float embed_scale = std::sqrt(static_cast<float>(config_.hidden_dim));
+    hidden = gb->scalar_multiply(hidden, embed_scale);
 
     static std::set<uint32_t> skip_layers = {};
     for (uint32_t layer_idx = 0; layer_idx < config_.num_layers; layer_idx++) {

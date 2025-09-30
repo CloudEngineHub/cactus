@@ -9,8 +9,38 @@ namespace engine {
 
 QwenModel::QwenModel() : Model() {}
 
-QwenModel::QwenModel(const Config& config) : Model(config) {}
+QwenModel::QwenModel(const Config& config) : Model(config) {
+    weight_nodes_.layers.resize(config.num_layers);
+}
 
+void QwenModel::load_weights_to_graph(CactusGraph* gb) {
+    embedding_node_id_ = gb->mmap_embeddings(embedding_file_path_);
+    weight_nodes_.output_norm_weight = gb->mmap_weights(model_folder_path_ + "/output_norm.weights");
+
+    if (config_.tie_word_embeddings) {
+        weight_nodes_.output_weight = embedding_node_id_;
+        output_weight_node_id_ = embedding_node_id_;
+    } else {
+        weight_nodes_.output_weight = gb->mmap_weights(model_folder_path_ + "/output_weight.weights");
+        output_weight_node_id_ = weight_nodes_.output_weight;
+    }
+
+    for (uint32_t i = 0; i < config_.num_layers; i++) {
+        auto& layer = weight_nodes_.layers[i];
+        std::string layer_prefix = model_folder_path_ + "/layer_" + std::to_string(i) + "_";
+        layer.attn_q_weight = gb->mmap_weights(layer_prefix + "attn_q.weights");
+        layer.attn_k_weight = gb->mmap_weights(layer_prefix + "attn_k.weights");
+        layer.attn_v_weight = gb->mmap_weights(layer_prefix + "attn_v.weights");
+        layer.attn_output_weight = gb->mmap_weights(layer_prefix + "attn_output.weights");
+        layer.input_layernorm_weight = gb->mmap_weights(layer_prefix + "input_norm.weights");
+        layer.attn_q_norm_weight = gb->mmap_weights(layer_prefix + "attn_q_norm.weights");
+        layer.attn_k_norm_weight = gb->mmap_weights(layer_prefix + "attn_k_norm.weights");
+        layer.ffn_gate_weight = gb->mmap_weights(layer_prefix + "ffn_gate.weights");
+        layer.ffn_up_weight = gb->mmap_weights(layer_prefix + "ffn_up.weights");
+        layer.ffn_down_weight = gb->mmap_weights(layer_prefix + "ffn_down.weights");
+        layer.post_attention_layernorm_weight = gb->mmap_weights(layer_prefix + "post_attn_norm.weights");
+    }
+}
 
 size_t QwenModel::build_attention(CactusGraph* gb, size_t normalized_input, uint32_t layer_idx,
                                  ComputeBackend backend, bool use_cache, size_t position_offset) {

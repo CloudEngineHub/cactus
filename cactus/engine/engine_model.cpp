@@ -13,21 +13,21 @@ namespace cactus {
 namespace engine {
 
 
-Model::Model() 
-    : tokenizer_(nullptr), 
+Model::Model()
+    : tokenizer_(nullptr),
       graph_handle_(nullptr),
       initialized_(false),
-      attention_scale_(0.0f) {
-    weight_nodes_.layers.resize(config_.num_layers);
+      attention_scale_(0.0f),
+      output_weight_node_id_(0) {
 }
 
-Model::Model(const Config& config) 
+Model::Model(const Config& config)
     : config_(config),
       tokenizer_(nullptr),
       graph_handle_(nullptr),
       initialized_(false),
-      attention_scale_(0.0f) {
-    weight_nodes_.layers.resize(config.num_layers);
+      attention_scale_(0.0f),
+      output_weight_node_id_(0) {
 }
 
 Model::~Model() {
@@ -81,11 +81,14 @@ bool Model::init(const std::string& model_folder, size_t context_size, const std
     graph_handle_ = gb;
     
     embedding_file_path_ = model_folder + "/token_embeddings.weights";
-    weight_nodes_.layers.resize(config_.num_layers);
-    
+
     load_weights_to_graph(gb);
     
-    attention_scale_ = 1.0f / std::sqrt(static_cast<float>(config_.attention_head_dim));
+    if (config_.model_type == Config::ModelType::GEMMA) {
+        attention_scale_ = 1.0f / std::sqrt(256.0f); 
+    } else {
+        attention_scale_ = 1.0f / std::sqrt(static_cast<float>(config_.attention_head_dim));
+    }
     
     Precision cache_precision;
     std::string precision_name;
@@ -129,33 +132,6 @@ bool Model::init(const std::string& model_folder, size_t context_size, const std
 }
 
 
-void Model::load_weights_to_graph(CactusGraph* gb) {
-    embedding_node_id_ = gb->mmap_embeddings(embedding_file_path_);
-    weight_nodes_.output_norm_weight = gb->mmap_weights(model_folder_path_ + "/output_norm.weights");
-    
-    if (config_.tie_word_embeddings) {
-        weight_nodes_.output_weight = embedding_node_id_;  
-    } else {
-        weight_nodes_.output_weight = gb->mmap_weights(model_folder_path_ + "/output_weight.weights");
-    }
-    
-    for (uint32_t i = 0; i < config_.num_layers; i++) {
-        auto& layer = weight_nodes_.layers[i];
-        std::string layer_prefix = model_folder_path_ + "/layer_" + std::to_string(i) + "_";
-        layer.attn_q_weight = gb->mmap_weights(layer_prefix + "attn_q.weights");
-        layer.attn_k_weight = gb->mmap_weights(layer_prefix + "attn_k.weights");
-        layer.attn_v_weight = gb->mmap_weights(layer_prefix + "attn_v.weights");
-        layer.attn_output_weight = gb->mmap_weights(layer_prefix + "attn_output.weights");
-        layer.input_layernorm_weight = gb->mmap_weights(layer_prefix + "input_norm.weights");
-        layer.attn_q_norm_weight = gb->mmap_weights(layer_prefix + "attn_q_norm.weights");
-        layer.attn_k_norm_weight = gb->mmap_weights(layer_prefix + "attn_k_norm.weights");
-        layer.ffn_gate_weight = gb->mmap_weights(layer_prefix + "ffn_gate.weights");
-        layer.ffn_up_weight = gb->mmap_weights(layer_prefix + "ffn_up.weights");
-        layer.ffn_down_weight = gb->mmap_weights(layer_prefix + "ffn_down.weights");
-        layer.post_attention_layernorm_weight = gb->mmap_weights(layer_prefix + "post_attn_norm.weights");
-    }
-}
-
 uint32_t Model::generate(const std::vector<uint32_t>& tokens, float temperature, float top_p, 
                         size_t top_k, const std::string& profile_file) {
     auto final_hidden = forward(tokens, true);
@@ -165,7 +141,7 @@ uint32_t Model::generate(const std::vector<uint32_t>& tokens, float temperature,
         ? ComputeBackend::CPU 
         : ComputeBackend::NPU;
     
-    auto logits_node_id = gb->matmul(final_hidden, weight_nodes_.output_weight, true, backend);
+    auto logits_node_id = gb->matmul(final_hidden, output_weight_node_id_, true, backend);
     auto sampled_token_id = gb->sample(logits_node_id, temperature, top_p, top_k);
     
     if (!profile_file.empty()) {
