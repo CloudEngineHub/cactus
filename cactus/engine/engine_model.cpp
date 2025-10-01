@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "../models/model.h"
 #include "../graph/graph.h"
 #include <iostream>
 #include <fstream>
