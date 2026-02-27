@@ -27,8 +27,6 @@ static void conv1d_causal_depthwise_f16_accelerate(
 {
     const size_t in_bs  = L * C;
     const size_t out_bs = L * C;
-    const size_t padded_len = L + (K - 1) * dilation;
-
     CactusThreading::parallel_for_2d(N, C, CactusThreading::Thresholds::ATTENTION, [&](size_t n, size_t c) {
         const __fp16* Xb = input  + n * in_bs;
         __fp16*       Yb = output + n * out_bs;

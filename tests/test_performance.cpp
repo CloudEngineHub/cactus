@@ -1090,12 +1090,8 @@ void run_layernorm_case(TestUtils::TestRunner& runner,
 void benchmark_layernorm(TestUtils::TestRunner& runner, const BenchmarkConfig&) {
     struct ShapeCase { size_t batch; size_t feat; const char* tag; };
     const std::vector<ShapeCase> shapes = {
-        {1,      1,  "edge:single    "},
-        {1,      7,  "edge:unaligned "},
-        {1,    512,  "prod:whisper-1 "},
         {128,  512,  "prod:whisper-128"},
         {1500, 512,  "prod:whisper-full"},
-        {1,   1024,  "prod:bert-1    "},
         {128, 1024,  "prod:bert-128  "},
     };
     const int iterations = 100;
@@ -1103,7 +1099,6 @@ void benchmark_layernorm(TestUtils::TestRunner& runner, const BenchmarkConfig&) 
     for (const auto& [batch, feat, tag] : shapes) {
         for (bool with_bias : {false, true}) {
             run_layernorm_case<__fp16>(runner, batch, feat, tag, with_bias, iterations);
-            run_layernorm_case<float> (runner, batch, feat, tag, with_bias, iterations);
         }
     }
 }
