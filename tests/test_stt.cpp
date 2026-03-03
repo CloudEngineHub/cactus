@@ -522,7 +522,7 @@ bool run_transcription_test(const char* title, const char* audio_file, const cha
 
     cactus_model_t model = cactus_init(g_transcribe_model_path, nullptr, false);
     if (!model) {
-        std::cerr << "[✗] Failed to initialize Whisper model\n";
+        std::cerr << "[✗] Failed to initialize transcription model\n";
         return false;
     }
 

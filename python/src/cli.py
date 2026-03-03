@@ -12,7 +12,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
 DEFAULT_MODEL_ID = "LiquidAI/LFM2.5-1.2B-Instruct"
-DEFAULT_TEST_TRANSCRIBE_MODEL_ID = "UsefulSensors/moonshine-base"
+DEFAULT_TEST_TRANSCRIBE_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
 DEFAULT_TEST_WHISPER_MODEL_ID = "openai/whisper-small"
 
 RED = '\033[0;31m'
@@ -186,6 +186,8 @@ def cmd_download(args):
             ensure_vad_weights(model_id, weights_dir, precision)
             return 0
 
+    tokenizer_labels = None
+
     try:
         import torch
         from transformers import AutoTokenizer
@@ -214,11 +216,49 @@ def cmd_download(args):
     import transformers
     transformers.logging.set_verbosity_error()
 
-    def _download_config_json(repo_id):
+    def _download_config_json(repo_id, revision=None):
         from huggingface_hub import hf_hub_download
-        config_path = hf_hub_download(repo_id=repo_id, filename="config.json", cache_dir=cache_dir, token=token)
+        config_path = hf_hub_download(
+            repo_id=repo_id,
+            filename="config.json",
+            cache_dir=cache_dir,
+            token=token,
+            revision=revision,
+        )
         with open(config_path, 'r', encoding='utf-8') as fh:
             return json.load(fh)
+
+    def _resolve_hf_revision(repo_id):
+        env_revision = os.getenv("CACTUS_HF_REVISION", "").strip()
+        if env_revision:
+            return env_revision
+        if repo_id.lower() == "nvidia/parakeet-tdt-0.6b-v3":
+            return "refs/pr/7"
+        return None
+
+    class _MinimalTokenizer:
+        """Fallback tokenizer for Parakeet-TDT when HF tokenizer load fails."""
+        def __init__(self, name_or_path, config_obj=None):
+            self.name_or_path = name_or_path
+            self.model_max_length = 131072
+            self.pad_token_id = 0
+            self.eos_token_id = 0
+
+            try:
+                pad_id = config_obj.get('pad_token_id', 0) if isinstance(config_obj, dict) else 0
+                self.pad_token_id = int(pad_id) if pad_id is not None else 0
+            except Exception:
+                self.pad_token_id = 0
+
+            try:
+                decoding = config_obj.get('decoding', {}) if isinstance(config_obj, dict) else {}
+                blank_id = decoding.get('blank_id', None) if isinstance(decoding, dict) else None
+                if blank_id is not None:
+                    self.eos_token_id = int(blank_id)
+                else:
+                    self.eos_token_id = self.pad_token_id
+            except Exception:
+                self.eos_token_id = self.pad_token_id
 
     def _load_raw_hf_state_dict(repo_id):
         from huggingface_hub import snapshot_download
@@ -343,12 +383,45 @@ def cmd_download(args):
             model = AutoModel.from_pretrained(model_id, cache_dir=cache_dir, trust_remote_code=True, token=token)
 
         elif is_parakeet:
-            from transformers import AutoConfig
             from huggingface_hub import hf_hub_download, snapshot_download
             from safetensors.torch import load_file as load_safetensors
 
-            tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=cache_dir, trust_remote_code=True, token=token)
-            config_obj = AutoConfig.from_pretrained(model_id, cache_dir=cache_dir, trust_remote_code=True, token=token)
+            revision = _resolve_hf_revision(model_id)
+            config_obj = _download_config_json(model_id, revision=revision)
+            is_parakeet_tdt = 'parakeet-tdt' in model_id.lower()
+            if 'parakeet-tdt' in model_id.lower():
+                cfg_labels = config_obj.get('labels', [])
+                if isinstance(cfg_labels, list) and cfg_labels:
+                    tokenizer_labels = cfg_labels
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    model_id,
+                    cache_dir=cache_dir,
+                    trust_remote_code=True,
+                    token=token,
+                    revision=revision,
+                )
+            except Exception as tok_err:
+                tokenizer = None
+                if "TokenizersBackend" in str(tok_err) or "does not exist or is not currently imported" in str(tok_err):
+                    from transformers import PreTrainedTokenizerFast
+                    print("  Note: Using PreTrainedTokenizerFast fallback for Parakeet tokenizer...")
+                    try:
+                        tokenizer = PreTrainedTokenizerFast.from_pretrained(
+                            model_id,
+                            cache_dir=cache_dir,
+                            token=token,
+                            revision=revision,
+                        )
+                    except Exception as fast_tok_err:
+                        tok_err = fast_tok_err
+
+                if tokenizer is None:
+                    if is_parakeet_tdt and isinstance(tokenizer_labels, list) and tokenizer_labels:
+                        print(f"  Note: Parakeet-TDT tokenizer load failed, using labels fallback ({tok_err})")
+                        tokenizer = _MinimalTokenizer(model_id, config_obj)
+                    else:
+                        raise
 
             state_dict = None
             try:
@@ -356,11 +429,17 @@ def cmd_download(args):
                     repo_id=model_id,
                     filename="model.safetensors",
                     cache_dir=cache_dir,
-                    token=token
+                    token=token,
+                    revision=revision,
                 )
                 state_dict = load_safetensors(weights_path, device="cpu")
             except Exception:
-                snapshot_path = snapshot_download(repo_id=model_id, cache_dir=cache_dir, token=token)
+                snapshot_path = snapshot_download(
+                    repo_id=model_id,
+                    cache_dir=cache_dir,
+                    token=token,
+                    revision=revision,
+                )
                 index_path = Path(snapshot_path) / "model.safetensors.index.json"
                 if not index_path.exists():
                     raise
@@ -462,7 +541,13 @@ def cmd_download(args):
             for key, value in config.items():
                 f.write(f"{key}={format_config_value(value)}\n")
 
-        convert_hf_tokenizer(tokenizer, weights_dir, token=token)
+        convert_hf_tokenizer(
+            tokenizer,
+            weights_dir,
+            token=token,
+            model_id=model_id,
+            labels=tokenizer_labels,
+        )
 
         del model
         del tokenizer

@@ -78,6 +78,13 @@ static std::string extract_whisper_language_code(std::string token_text) {
     return inner;
 }
 
+static bool is_terminal_transcription_piece(const std::string& piece) {
+    return piece == "<|endoftext|>" ||
+           piece == "<|endoftranscript|>" ||
+           piece == "</s>" ||
+           piece == "<pad>";
+}
+
 extern "C" {
 
 int cactus_transcribe(
@@ -167,7 +174,9 @@ int cactus_transcribe(
         (void)telemetry_enabled;
 
         bool is_moonshine = handle->model->get_config().model_type == cactus::engine::Config::ModelType::MOONSHINE;
-        bool is_parakeet = handle->model->get_config().model_type == cactus::engine::Config::ModelType::PARAKEET;
+        bool is_parakeet =
+            handle->model->get_config().model_type == cactus::engine::Config::ModelType::PARAKEET ||
+            handle->model->get_config().model_type == cactus::engine::Config::ModelType::PARAKEET_TDT;
 
         std::vector<float> audio_samples;
         if (audio_file_path == nullptr) {
@@ -261,7 +270,17 @@ int cactus_transcribe(
         float max_tps = handle->model->get_config().default_max_tps;
         if (max_tps < 0) max_tps = 100;
 
-        const std::vector<std::vector<uint32_t>> stop_token_sequences = {{ tokenizer->get_eos_token() }};
+        std::vector<std::vector<uint32_t>> stop_token_sequences = {{ tokenizer->get_eos_token() }};
+        auto append_exact_stop_sequence = [&](const char* stop_text) {
+            std::vector<uint32_t> seq = tokenizer->encode(stop_text);
+            if (!seq.empty() && tokenizer->decode(seq) == stop_text) {
+                stop_token_sequences.push_back(std::move(seq));
+            }
+        };
+        append_exact_stop_sequence("<|endoftext|>");
+        append_exact_stop_sequence("<|endoftranscript|>");
+        append_exact_stop_sequence("</s>");
+        append_exact_stop_sequence("<pad>");
 
         double time_to_first_token = 0.0;
         size_t completion_tokens = 0;
@@ -346,14 +365,19 @@ int cactus_transcribe(
                 if (token_entropy > max_token_entropy_norm) max_token_entropy_norm = token_entropy;
 
                 generated_tokens.emplace_back(next_token);
-                tokens.emplace_back(next_token);
-                completion_tokens++;
+                if (matches_stop_sequence(generated_tokens, stop_token_sequences)) {
+                    break;
+                }
 
                 std::string piece = tokenizer->decode({ next_token });
+                if (is_terminal_transcription_piece(piece)) {
+                    break;
+                }
+
+                tokens.emplace_back(next_token);
+                completion_tokens++;
                 final_text += piece;
                 if (callback) callback(piece.c_str(), next_token, user_data);
-
-                if (matches_stop_sequence(generated_tokens, stop_token_sequences)) break;
             }
 
             cactus_reset(model);
@@ -370,7 +394,7 @@ int cactus_transcribe(
         double decode_tps = (completion_tokens > 1 && decode_time_ms > 0.0) ? ((completion_tokens - 1) * 1000.0) / decode_time_ms : 0.0;
 
         const std::vector<std::string> tokens_to_remove = {
-            "<|startoftranscript|>", "</s>", "<pad>"
+            "<|startoftranscript|>", "</s>", "<pad>", "<|endoftext|>", "<|endoftranscript|>"
         };
         for (const auto& token : tokens_to_remove) {
             size_t pos = 0;
