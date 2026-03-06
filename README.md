@@ -155,7 +155,6 @@ graph.hard_reset();
 | nvidia/parakeet-ctc-0.6b | 600M | 201.77 | 201.44 | 5214285 | yes | 0.0101 | 0.0930 |
 | nvidia/parakeet-tdt-0.6b-v3 | 600M | 718.91 | 718.82 | 3583333 | no | 0.0359 | 0.0465 |
 | nvidia/parakeet-ctc-1.1b | 1.1B | 279.03 | 278.92 | 4562500 | yes | 0.0139 | 0.1628 |
-| apple/speech (en-US) | – | 3738.92 | – | – | – | 0.1866 | 0.1628 |
 
 ## Supported LLMs
 
