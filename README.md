@@ -122,10 +122,12 @@ graph.hard_reset();
 
 ## Benchmarks
 
+### Across devices 
+
 - All weights INT4 quantised
 - LFM: 1k-prefill / 100-decode, values are prefill tps / decode tps
 - LFM-VL: 256px input, values are latency / decode tps
-- Parakeet: 30s audio input, values are latency / decode tps
+- Parakeet: 20s audio input, values are latency / decode tps
 - Missing latency = no NPU support yet
 
 | Device | LFM 1.2B | LFMVL 1.6B | Parakeet 1.1B | RAM |
@@ -139,6 +141,22 @@ graph.hard_reset();
 | Galaxy A17 5G | 32/10 | -/11 | -/40k+ | 727MB |
 | CMF Phone 2 Pro | - | - | - | - |
 | Raspberry Pi 5 | 69/11 | 13.3s/11 | 4.5s/180k+ | 869MB |
+
+### Comparing Transcription models
+
+- STT: 20s audio input on Macbook Air M3 chip
+
+| Model | Wall ms | TTFT ms | Decode tps | NPU | RTF | WER |
+|-------|---------|---------|------------|-----|-----|-----|
+| UsefulSensors/moonshine-base | 361.35 | 182.12 | 262.48 | yes | 0.0180 | 0.1395 |
+| openai/whisper-tiny | 232.03 | 137.38 | 581.87 | yes | 0.0116 | 0.1860 |
+| openai/whisper-base | 329.37 | 178.65 | 358.66 | yes | 0.0164 | 0.1628 |
+| openai/whisper-small | 856.79 | 332.63 | 108.81 | yes | 0.0428 | 0.0930 |
+| openai/whisper-medium | 2085.87 | 923.33 | 49.04 | yes | 0.1041 | 0.0930 |
+| nvidia/parakeet-ctc-0.6b | 201.77 | 201.44 | 5214285.71 | yes | 0.0101 | 0.0930 |
+| nvidia/parakeet-tdt-0.6b-v3 | 718.91 | 718.82 | 3583333.33 | no | 0.0359 | 0.0465 |
+| nvidia/parakeet-ctc-1.1b | 279.03 | 278.92 | 4562500.00 | yes | 0.0139 | 0.1628 |
+| apple/speech (en-US) | 3738.92 | – | – | – | 0.1866 | 0.1628 |
 
 ## Roadmap
 
