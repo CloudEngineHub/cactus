@@ -8,6 +8,8 @@ keywords: ["Flutter SDK", "dart FFI", "on-device AI", "mobile inference", "iOS",
 
 Run AI models on-device with dart:ffi direct bindings for iOS, macOS, and Android.
 
+> **Model weights:** Pre-converted weights for all supported models at [huggingface.co/Cactus-Compute](https://huggingface.co/Cactus-Compute).
+
 ## Building
 
 <!-- --8<-- [start:install] -->
@@ -219,6 +221,12 @@ List<int> cactusTokenize(CactusModelT model, String text)
 String cactusScoreWindow(CactusModelT model, List<int> tokens, int start, int end, int context)
 ```
 
+### Detect Language
+
+```dart
+String cactusDetectLanguage(CactusModelT model, String? audioPath, String? optionsJson, Uint8List? pcmData)
+```
+
 ### VAD / RAG
 
 ```dart
@@ -238,10 +246,17 @@ String cactusIndexQuery(CactusIndexT index, List<double> embedding, String? opti
 int cactusIndexCompact(CactusIndexT index)
 ```
 
+### Logging
+
+```dart
+void cactusLogSetLevel(int level)  // 0=DEBUG 1=INFO 2=WARN 3=ERROR 4=NONE
+void cactusLogSetCallback(void Function(int level, String component, String message)? onLog)
+```
+
 ### Telemetry
 
 ```dart
-void cactusSetTelemetryEnvironment(String cacheDir)
+void cactusSetTelemetryEnvironment(String cacheLocation)
 void cactusSetAppId(String appId)
 void cactusTelemetryFlush()
 void cactusTelemetryShutdown()
@@ -289,7 +304,7 @@ final path = '${Directory.current.path}/model';
 
 - Flutter 3.0+
 - Dart 2.17+
-- iOS 14.0+ / macOS 13.0+
+- iOS 13.0+ / macOS 13.0+
 - Android API 24+ / arm64-v8a
 
 ## See Also

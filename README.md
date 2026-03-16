@@ -126,6 +126,8 @@ graph.hard_reset();
 | [Rust SDK](/rust/) | Rust | Mac, Linux |
 | [React Native](https://github.com/cactus-compute/cactus-react-native) | JavaScript | iOS, Android |
 
+> **Model weights:** Pre-converted weights for all supported models at [huggingface.co/Cactus-Compute](https://huggingface.co/Cactus-Compute).
+
 ## Benchmarks (CPU-only, no GPU)
 
 - All weights INT4 quantised
