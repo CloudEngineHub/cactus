@@ -152,6 +152,13 @@ for (final seg in result['segments'] as List) {
 }
 ```
 
+**Custom vocabulary** biases the decoder toward domain-specific words (supported for Whisper and Moonshine models). Pass `custom_vocabulary` and `vocabulary_boost` in the options JSON:
+
+```dart
+final options = '{"custom_vocabulary": ["Omeprazole", "HIPAA", "Cactus"], "vocabulary_boost": 3.0}';
+final result = cactusTranscribe(model, '/path/to/audio.wav', '', options, null, null);
+```
+
 ### Streaming Transcription
 
 ```dart
@@ -167,6 +174,8 @@ print(partialJson);
 final finalJson = cactusStreamTranscribeStop(stream);
 print(finalJson);
 ```
+
+Streaming also accepts `custom_vocabulary` in the options passed to `cactusStreamTranscribeStart`. The bias is applied for the lifetime of the stream session.
 
 ### Embeddings
 

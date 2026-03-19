@@ -216,6 +216,13 @@ for (i in 0 until segments.length()) {
 }
 ```
 
+**Custom vocabulary** biases the decoder toward domain-specific words (supported for Whisper and Moonshine models). Pass `custom_vocabulary` and `vocabulary_boost` in the options JSON:
+
+```kotlin
+val options = """{"custom_vocabulary": ["Omeprazole", "HIPAA", "Cactus"], "vocabulary_boost": 3.0}"""
+val result = cactusTranscribe(model, "/path/to/audio.wav", "", options, null, null)
+```
+
 ### Streaming Transcription
 
 ```kotlin
@@ -223,6 +230,8 @@ val stream = cactusStreamTranscribeStart(model, null)
 val partial = cactusStreamTranscribeProcess(stream, audioChunk)
 val final_  = cactusStreamTranscribeStop(stream)
 ```
+
+Streaming also accepts `custom_vocabulary` in the options passed to `cactusStreamTranscribeStart`. The bias is applied for the lifetime of the stream session.
 
 ### Embeddings
 
