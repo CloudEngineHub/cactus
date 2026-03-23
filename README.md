@@ -206,11 +206,10 @@ graph.hard_reset();
 | Feb 2026 | Done | Hybrid inference, INT4, lossless Quant (1.5x) |
 | Mar 2026 | Coming | Qualcomm/Google NPUs, 5-11x faster Android |
 | Apr 2026 | Coming | Mediatek/Exynos NPUs, Cactus@ICLR |
-| May 2026 | Coming | Kernel→C++, Graph/Engine→Rust, Mac GPU & VR |
+| May 2026 | Coming | Wearables & custom chips optimisations |
 | Jun 2026 | Coming | Torch/JAX model transpilers |
-| Jul 2026 | Coming | Wearables optimisations, Cactus@ICML |
-| Aug 2026 | Coming | Orchestration |
-| Sep 2026 | Coming | Full Cactus paper, chip manufacturer partners |
+| Jul 2026 | Coming | Orchestration, Cactus@ICML |
+| Aug 2026 | Coming | 1yr post-v1 launch | 
 
 ## Using this repo
 
