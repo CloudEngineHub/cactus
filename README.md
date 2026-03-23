@@ -208,8 +208,6 @@ graph.hard_reset();
 | Apr 2026 | Coming | Mediatek/Exynos NPUs, Cactus@ICLR |
 | May 2026 | Coming | Wearables & custom chips optimisations |
 | Jun 2026 | Coming | Torch/JAX model transpilers |
-| Jul 2026 | Coming | Orchestration, Cactus@ICML |
-| Aug 2026 | Coming | 1yr post-v1 launch | 
 
 ## Using this repo
 
