@@ -137,7 +137,7 @@ graph.hard_reset();
 - Parakeet: 20s audio input, values are latency / decode tps
 - Missing latency = no NPU support yet
 
-| Device | LFM 1.2B | LFMVL 1.6B | Parakeet 1.1B | RAM |
+| Device | LFM 1.2B | LFMVL 1.6B | Parakeet 1.1B | VL RAM Usage |
 |--------|----------|------------|---------------|-----|
 | Mac M4 Pro | 582/100 | 0.2s/98 | 0.1s/900k+ | 76MB |
 | iPad/Mac M3 | 350/60 | 0.3s/69 | 0.3s/800k+ | 70MB |
