@@ -182,6 +182,8 @@ graph.hard_reset();
 | google/gemma-3n-E2B-it | completion, tools |
 | google/gemma-4-E4B-it | completion, tools, embed, vision, speech|
 | google/gemma-3n-E4B-it | completion, tools |
+| google/gemma-4-E2B-it | vision, audio, completion, tools, Apple NPU |
+| google/gemma-4-E4B-it | vision, audio, completion, tools, Apple NPU |
 | Qwen/Qwen3-0.6B | completion, tools, embed | 
 | Qwen/Qwen3-Embedding-0.6B | embed | 
 | Qwen/Qwen3.5-0.8B | vision, completion, tools, embed |
