@@ -1135,27 +1135,41 @@ void cactus_attention_hybrid_int8_fp16(
                         float score = 0.0f;
 
                         if (kv_pos < cache_len) {
-                            const int8_t* k_vec = K_cached_base + kv_pos * k_seq_stride + kv_head_idx * head_dim;
-                            const float* k_scale_base = k_scales + (kv_pos * num_kv_heads + kv_head_idx) * num_quant_groups_k;
+                            if (k_scales != nullptr) {
+                                const int8_t* k_vec = K_cached_base + kv_pos * k_seq_stride + kv_head_idx * head_dim;
+                                const float* k_scale_base = k_scales + (kv_pos * num_kv_heads + kv_head_idx) * num_quant_groups_k;
 
-                            for (size_t quant_group = 0; quant_group < num_quant_groups_k; quant_group++) {
-                                const size_t dim_base = quant_group * quant_group_size;
+                                for (size_t quant_group = 0; quant_group < num_quant_groups_k; quant_group++) {
+                                    const size_t dim_base = quant_group * quant_group_size;
+                                    float16x8_t s_acc = vdupq_n_f16((__fp16)0.0f);
 
+                                    #pragma unroll
+                                    for (size_t i = 0; i < 4; i++) {
+                                        const size_t dim_block = dim_base + i * VECTOR_WIDTH;
+                                        if (dim_block >= head_dim_aligned) break;
+
+                                        float16x8_t q_f16 = vld1q_f16(&q_vec[dim_block]);
+                                        float16x8_t k_f16 = vcvtq_f16_s16(vmovl_s8(vld1_s8(&k_vec[dim_block])));
+                                        s_acc = vfmaq_f16(s_acc, q_f16, k_f16);
+                                    }
+
+                                    float partial = vaddvq_f32(vcvt_f32_f16(vget_low_f16(s_acc))) +
+                                                    vaddvq_f32(vcvt_f32_f16(vget_high_f16(s_acc)));
+                                    score += k_scale_base[quant_group] * partial;
+                                }
+                            } else {
+                                const __fp16* k_vec = reinterpret_cast<const __fp16*>(K_cached_base) +
+                                    kv_pos * k_seq_stride + kv_head_idx * head_dim;
                                 float16x8_t s_acc = vdupq_n_f16((__fp16)0.0f);
 
-                                #pragma unroll
-                                for (size_t i = 0; i < 4; i++) {
-                                    const size_t dim_block = dim_base + i * VECTOR_WIDTH;
-                                    if (dim_block >= head_dim_aligned) break;
-
+                                for (size_t dim_block = 0; dim_block < head_dim_aligned; dim_block += VECTOR_WIDTH) {
                                     float16x8_t q_f16 = vld1q_f16(&q_vec[dim_block]);
-                                    float16x8_t k_f16 = vcvtq_f16_s16(vmovl_s8(vld1_s8(&k_vec[dim_block])));
+                                    float16x8_t k_f16 = vld1q_f16(&k_vec[dim_block]);
                                     s_acc = vfmaq_f16(s_acc, q_f16, k_f16);
                                 }
 
-                                float partial = vaddvq_f32(vcvt_f32_f16(vget_low_f16(s_acc))) +
-                                                vaddvq_f32(vcvt_f32_f16(vget_high_f16(s_acc)));
-                                score += k_scale_base[quant_group] * partial;
+                                score = vaddvq_f32(vcvt_f32_f16(vget_low_f16(s_acc))) +
+                                        vaddvq_f32(vcvt_f32_f16(vget_high_f16(s_acc)));
                             }
                         } else {
                             const size_t new_pos = kv_pos - cache_len;
@@ -1209,20 +1223,31 @@ void cactus_attention_hybrid_int8_fp16(
                         const size_t kv_pos = kv_block_start + kv_idx;
 
                         if (kv_pos < cache_len) {
-                            const int8_t* v_vec = V_cached_base + kv_pos * v_seq_stride + kv_head_idx * v_head_dim;
-                            const float* v_scale_base = v_scales + (kv_pos * num_kv_heads + kv_head_idx) * num_quant_groups_v;
+                            if (v_scales != nullptr) {
+                                const int8_t* v_vec = V_cached_base + kv_pos * v_seq_stride + kv_head_idx * v_head_dim;
+                                const float* v_scale_base = v_scales + (kv_pos * num_kv_heads + kv_head_idx) * num_quant_groups_v;
 
-                            for (size_t quant_group = 0; quant_group < num_quant_groups_v; quant_group++) {
-                                const size_t dim_base = quant_group * quant_group_size;
-                                const float16x8_t ws_vec = vdupq_n_f16(static_cast<__fp16>(attn_weight * v_scale_base[quant_group]));
+                                for (size_t quant_group = 0; quant_group < num_quant_groups_v; quant_group++) {
+                                    const size_t dim_base = quant_group * quant_group_size;
+                                    const float16x8_t ws_vec = vdupq_n_f16(static_cast<__fp16>(attn_weight * v_scale_base[quant_group]));
 
-                                #pragma unroll
-                                for (size_t i = 0; i < 4; i++) {
-                                    const size_t dim_block = dim_base + i * VECTOR_WIDTH;
-                                    if (dim_block >= v_head_dim_aligned) break;
+                                    #pragma unroll
+                                    for (size_t i = 0; i < 4; i++) {
+                                        const size_t dim_block = dim_base + i * VECTOR_WIDTH;
+                                        if (dim_block >= v_head_dim_aligned) break;
 
-                                    float16x8_t v_f16 = vcvtq_f16_s16(vmovl_s8(vld1_s8(&v_vec[dim_block])));
-                                    block_accum[dim_block / VECTOR_WIDTH] = vfmaq_f16(block_accum[dim_block / VECTOR_WIDTH], v_f16, ws_vec);
+                                        float16x8_t v_f16 = vcvtq_f16_s16(vmovl_s8(vld1_s8(&v_vec[dim_block])));
+                                        block_accum[dim_block / VECTOR_WIDTH] = vfmaq_f16(block_accum[dim_block / VECTOR_WIDTH], v_f16, ws_vec);
+                                    }
+                                }
+                            } else {
+                                const __fp16* v_vec = reinterpret_cast<const __fp16*>(V_cached_base) +
+                                    kv_pos * v_seq_stride + kv_head_idx * v_head_dim;
+                                const float16x8_t w_vec = vdupq_n_f16(static_cast<__fp16>(attn_weight));
+
+                                for (size_t dim_block = 0; dim_block < v_head_dim_aligned; dim_block += VECTOR_WIDTH) {
+                                    block_accum[dim_block / VECTOR_WIDTH] =
+                                        vfmaq_f16(block_accum[dim_block / VECTOR_WIDTH], vld1q_f16(&v_vec[dim_block]), w_vec);
                                 }
                             }
                         } else {
@@ -1481,38 +1506,54 @@ struct RoPECacheF16 {
     RoPECacheF16() : max_seq_len(0), head_dim(0), theta(0.0f), initialized(false) {}
 };
 
-static thread_local RoPECacheF16 rope_cache_f16;
+static thread_local std::vector<RoPECacheF16> rope_caches_f16;
+static thread_local RoPECacheF16* active_rope_cache_f16 = nullptr;
 
 void precompute_rope_tables_f16(size_t seq_len, size_t head_dim, float theta) {
-    if (rope_cache_f16.initialized && 
-        rope_cache_f16.max_seq_len >= seq_len && 
-        rope_cache_f16.head_dim == head_dim && 
-        rope_cache_f16.theta == theta) {
+    RoPECacheF16* cache = nullptr;
+    for (auto& candidate : rope_caches_f16) {
+        if (candidate.initialized && candidate.head_dim == head_dim && candidate.theta == theta) {
+            cache = &candidate;
+            break;
+        }
+    }
+    if (!cache) {
+        rope_caches_f16.emplace_back();
+        cache = &rope_caches_f16.back();
+        cache->head_dim = head_dim;
+        cache->theta = theta;
+    }
+
+    active_rope_cache_f16 = cache;
+    if (cache->initialized && cache->max_seq_len >= seq_len) {
         return;
     }
-        
+
     const size_t half_dim = head_dim / 2;
     const size_t table_size = seq_len * half_dim;
-    
-    rope_cache_f16.cos_table.resize(table_size);
-    rope_cache_f16.sin_table.resize(table_size);
-        
-    for (size_t pos = 0; pos < seq_len; ++pos) {
+
+    size_t start_pos = 0;
+    if (cache->initialized) {
+        start_pos = cache->max_seq_len;
+    }
+
+    cache->cos_table.resize(table_size);
+    cache->sin_table.resize(table_size);
+
+    for (size_t pos = start_pos; pos < seq_len; ++pos) {
         const float pos_float = static_cast<float>(pos);
         for (size_t i = 0; i < half_dim; ++i) {
             const float freq = 1.0f / powf(theta, (2.0f * i) / head_dim);
             const float angle = pos_float * freq;
-            
+
             const size_t idx = pos * half_dim + i;
-            rope_cache_f16.cos_table[idx] = static_cast<__fp16>(cosf(angle));
-            rope_cache_f16.sin_table[idx] = static_cast<__fp16>(sinf(angle));
+            cache->cos_table[idx] = static_cast<__fp16>(cosf(angle));
+            cache->sin_table[idx] = static_cast<__fp16>(sinf(angle));
         }
     }
-    
-    rope_cache_f16.max_seq_len = seq_len;
-    rope_cache_f16.head_dim = head_dim;
-    rope_cache_f16.theta = theta;
-    rope_cache_f16.initialized = true;
+
+    cache->max_seq_len = seq_len;
+    cache->initialized = true;
 }
 
 }
@@ -1531,8 +1572,9 @@ void cactus_rope_f16(
     
     CactusRoPEF16::precompute_rope_tables_f16(seq_len + start_pos, head_dim, theta);
     
-    const __fp16* cos_cache = CactusRoPEF16::rope_cache_f16.cos_table.data() + start_pos * half_dim;
-    const __fp16* sin_cache = CactusRoPEF16::rope_cache_f16.sin_table.data() + start_pos * half_dim;
+    const auto& cache = *CactusRoPEF16::active_rope_cache_f16;
+    const __fp16* cos_cache = cache.cos_table.data() + start_pos * half_dim;
+    const __fp16* sin_cache = cache.sin_table.data() + start_pos * half_dim;
 
     CactusThreading::parallel_for(batch_size * seq_len, CactusThreading::Thresholds::SCALAR_EXPENSIVE,
         [&](size_t start_idx, size_t end_idx) {
@@ -1596,8 +1638,9 @@ void cactus_gpt_j_rope_f16(
     
     CactusRoPEF16::precompute_rope_tables_f16(seq_len + start_pos, rot_dim, theta);
     
-    const __fp16* cos_cache = CactusRoPEF16::rope_cache_f16.cos_table.data() + start_pos * half_rot_dim;
-    const __fp16* sin_cache = CactusRoPEF16::rope_cache_f16.sin_table.data() + start_pos * half_rot_dim;
+    const auto& cache = *CactusRoPEF16::active_rope_cache_f16;
+    const __fp16* cos_cache = cache.cos_table.data() + start_pos * half_rot_dim;
+    const __fp16* sin_cache = cache.sin_table.data() + start_pos * half_rot_dim;
 
     CactusThreading::parallel_for(batch_size * seq_len, CactusThreading::Thresholds::SCALAR_EXPENSIVE,
         [&](size_t start_idx, size_t end_idx) {

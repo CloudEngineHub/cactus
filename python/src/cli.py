@@ -759,6 +759,143 @@ def cmd_build(args):
     if result.returncode != 0:
         print_color(RED, "Failed to build cactus library")
         return 1
+    tests_dir = PROJECT_ROOT / "cactus-engine" / "tests"
+    build_dir = tests_dir / "build"
+    build_dir.mkdir(parents=True, exist_ok=True)
+
+    print("Compiling chat.cpp...")
+
+    chat_cpp = tests_dir / "chat.cpp"
+    if not chat_cpp.exists():
+        print_color(RED, f"Error: chat.cpp not found at {chat_cpp}")
+        return 1
+
+    is_darwin = platform.system() == "Darwin"
+    vendored_curl = PROJECT_ROOT / "cactus-engine" / "libs" / "curl" / "lib" / "libcurl.a"
+
+    sdl2_available = False
+    sdl2_flags = []
+    sdl2_link = []
+    if is_darwin:
+        sdl2_check = subprocess.run(["brew", "list", "sdl2"], capture_output=True)
+        if sdl2_check.returncode == 0:
+            sdl2_prefix_result = subprocess.run(["brew", "--prefix", "sdl2"], capture_output=True, text=True)
+            if sdl2_prefix_result.returncode == 0:
+                sdl2_prefix = sdl2_prefix_result.stdout.strip()
+                sdl2_flags = ["-DHAVE_SDL2", f"-I{sdl2_prefix}/include", f"-I{sdl2_prefix}/include/SDL2"]
+                sdl2_link = [f"-L{sdl2_prefix}/lib", "-lSDL2"]
+                sdl2_available = True
+    else:
+        sdl2_check = subprocess.run(["pkg-config", "--exists", "sdl2"], capture_output=True)
+        if sdl2_check.returncode == 0:
+            cflags = subprocess.run(["pkg-config", "--cflags", "sdl2"], capture_output=True, text=True)
+            libs = subprocess.run(["pkg-config", "--libs", "sdl2"], capture_output=True, text=True)
+            if cflags.returncode == 0 and libs.returncode == 0:
+                sdl2_flags = ["-DHAVE_SDL2"] + cflags.stdout.strip().split()
+                sdl2_link = libs.stdout.strip().split()
+                sdl2_available = True
+
+    if sdl2_available:
+        print_color(GREEN, "SDL2 found - building with live audio support")
+    else:
+        print_color(YELLOW, "SDL2 not found - live mic recording will be disabled")
+        print_color(YELLOW, "Install SDL2 for live mic support: brew install sdl2 (macOS)")
+        print_color(YELLOW, "Then run `cactus build`")
+
+    if is_darwin:
+        curl_link = [str(vendored_curl)] if vendored_curl.exists() else ["-lcurl"]
+        compiler = "clang++"
+        cmd = [
+            compiler, "-std=c++20", "-O3",
+            "-DACCELERATE_NEW_LAPACK",
+            f"-I{PROJECT_ROOT}",
+            f"-I{PROJECT_ROOT / 'cactus-engine'}",
+            f"-I{PROJECT_ROOT / 'cactus-graph'}",
+            f"-I{PROJECT_ROOT / 'cactus-kernels'}",
+            *sdl2_flags,
+            str(chat_cpp),
+            str(lib_path),
+            "-o", "chat",
+            *curl_link,
+            "-framework", "Accelerate",
+            "-framework", "CoreML",
+            "-framework", "Foundation",
+            "-framework", "Security",
+            "-framework", "SystemConfiguration",
+            "-framework", "CFNetwork",
+            *sdl2_link,
+        ]
+    else:
+        compiler = "g++"
+        cmd = [
+            compiler, "-std=c++20", "-O3",
+            f"-I{PROJECT_ROOT}",
+            f"-I{PROJECT_ROOT / 'cactus-engine'}",
+            f"-I{PROJECT_ROOT / 'cactus-graph'}",
+            f"-I{PROJECT_ROOT / 'cactus-kernels'}",
+            *sdl2_flags,
+            str(chat_cpp),
+            str(lib_path),
+            "-o", "chat",
+            "-lcurl",
+            "-pthread",
+            *sdl2_link,
+        ]
+
+    if not check_command(compiler):
+        print_color(RED, f"Error: {compiler} is not installed")
+        return 1
+
+    result = subprocess.run(cmd, cwd=build_dir)
+    if result.returncode != 0:
+        print_color(RED, "Build failed")
+        return 1
+
+    print_color(GREEN, f"Build complete: {build_dir / 'chat'}")
+
+    asr_cpp = tests_dir / "asr.cpp"
+    if asr_cpp.exists():
+        print("Compiling asr.cpp...")
+
+        if is_darwin:
+            curl_link = [str(vendored_curl)] if vendored_curl.exists() else ["-lcurl"]
+            cmd = [
+                compiler, "-std=c++20", "-O3",
+                "-DACCELERATE_NEW_LAPACK",
+                f"-I{PROJECT_ROOT}",
+                *sdl2_flags,
+                str(asr_cpp),
+                str(lib_path),
+                "-o", "asr",
+                *curl_link,
+                "-framework", "Accelerate",
+                "-framework", "CoreML",
+                "-framework", "Foundation",
+                "-framework", "Security",
+                "-framework", "SystemConfiguration",
+                "-framework", "CFNetwork",
+                *sdl2_link,
+            ]
+        else:
+            cmd = [
+                compiler, "-std=c++20", "-O3",
+                f"-I{PROJECT_ROOT}",
+                *sdl2_flags,
+                str(asr_cpp),
+                str(lib_path),
+                "-o", "asr",
+                "-lcurl",
+                "-pthread",
+                *sdl2_link,
+            ]
+
+        result = subprocess.run(cmd, cwd=build_dir)
+        if result.returncode != 0:
+            print_color(RED, "ASR build failed")
+            return 1
+
+        print_color(GREEN, f"Build complete: {build_dir / 'asr'}")
+
     print_color(GREEN, "Cactus library built successfully!")
     print(f"Library location: {lib_path}")
 
