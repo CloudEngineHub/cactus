@@ -287,6 +287,8 @@ struct BufferDesc {
             .right_signs = cq_right_signs,
             .permutation = cq_permutation,
             .rotation = cq_rotation,
+            .expanded = nullptr,
+            .norm_f32 = nullptr,
         };
     }
 
