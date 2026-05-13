@@ -42,8 +42,9 @@ def _hf_cache_dir() -> str | None:
 
 
 def _load_hf(model_id_or_path: str, device: str):
-    import logging
+    import logging, warnings
     logging.getLogger("transformers").setLevel(logging.ERROR)
+    warnings.filterwarnings("ignore", message=".*You are using a model of type.*")
     try:
         from transformers import AutoConfig, AutoModel
     except Exception as exc:  # pragma: no cover

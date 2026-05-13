@@ -13,10 +13,12 @@ except Exception:  # pragma: no cover
     torch = None
 
 from ..cactus_adapters.config_utils import (
+    extract_audio_config,
     extract_base_config,
     extract_complex_gemma_config,
     extract_parakeet_config,
     extract_parakeet_tdt_config,
+    extract_vision_config,
     extract_whisper_config,
 )
 from .naming import NameMatch, cactus_name_for_tensor, gemma4_scale_factor, restore_hf_key_for_family
@@ -132,6 +134,12 @@ class Gemma4Adapter(FamilyAdapter):
         base_cfg = text_cfg if text_cfg is not None else cfg
         config = extract_base_config(base_cfg, cfg)
         config.update(extract_complex_gemma_config(base_cfg, cfg))
+        vision_cfg = _cfg_get(cfg, "vision_config", None)
+        if vision_cfg:
+            config.update(extract_vision_config(cfg, vision_cfg))
+        audio_cfg = _cfg_get(cfg, "audio_config", None)
+        if audio_cfg:
+            config.update(extract_audio_config(cfg, audio_cfg))
         return config
 
     def model_class(self, cfg: Any):
