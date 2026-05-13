@@ -14,6 +14,7 @@ except Exception:  # pragma: no cover
 
 from ..cactus_adapters.config_utils import (
     extract_base_config,
+    extract_complex_gemma_config,
     extract_parakeet_config,
     extract_parakeet_tdt_config,
     extract_whisper_config,
@@ -125,6 +126,13 @@ class FamilyAdapter:
 
 class Gemma4Adapter(FamilyAdapter):
     family = "gemma4"
+
+    def runtime_config(self, cfg: Any) -> dict[str, Any]:
+        text_cfg = _cfg_get(cfg, "text_config", None)
+        base_cfg = text_cfg if text_cfg is not None else cfg
+        config = extract_base_config(base_cfg, cfg)
+        config.update(extract_complex_gemma_config(base_cfg, cfg))
+        return config
 
     def model_class(self, cfg: Any):
         from transformers import AutoModel
