@@ -641,13 +641,11 @@ MappedFile::MappedFile(MappedFile&& other) noexcept
       group_size_(other.group_size_), num_groups_(other.num_groups_),
       scales_offset_(other.scales_offset_), scales_bytes_(other.scales_bytes_),
       alignment_(other.alignment_),
-      is_interleaved_(other.is_interleaved_),
       is_orthogonal_rotation_(other.is_orthogonal_rotation_),
       original_N_(other.original_N_) {
     other.fd_ = -1;
     other.mapped_data_ = nullptr;
     other.file_size_ = 0;
-    other.is_interleaved_ = false;
     other.is_orthogonal_rotation_ = false;
     other.original_N_ = 0;
 }
@@ -673,13 +671,11 @@ MappedFile& MappedFile::operator=(MappedFile&& other) noexcept {
         scales_offset_ = other.scales_offset_;
         scales_bytes_ = other.scales_bytes_;
         alignment_ = other.alignment_;
-        is_interleaved_ = other.is_interleaved_;
         is_orthogonal_rotation_ = other.is_orthogonal_rotation_;
         original_N_ = other.original_N_;
         other.fd_ = -1;
         other.mapped_data_ = nullptr;
         other.file_size_ = 0;
-        other.is_interleaved_ = false;
         other.is_orthogonal_rotation_ = false;
         other.original_N_ = 0;
     }
