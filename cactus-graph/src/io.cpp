@@ -19,9 +19,7 @@ namespace {
 
     constexpr uint32_t CACTUS_MAGIC = 0x54434143;
     constexpr uint32_t CACTUS_GRAPH_MAGIC = fourcc('C', 'G', 'R', 'F');
-    constexpr uint32_t FLAG_HAS_SCALES = 1 << 0;
     constexpr uint32_t FLAG_ORTHOGONAL_ROTATION = 1 << 1;
-    constexpr uint32_t FLAG_INTERLEAVED = 1 << 3;
     constexpr size_t HEADER_SIZE = 84;
 
     inline size_t align_offset(size_t offset, size_t alignment) {
@@ -733,7 +731,6 @@ void MappedFile::parse_header() {
 
     uint32_t flags = *reinterpret_cast<const uint32_t*>(ptr + offset);
     offset += sizeof(uint32_t);
-    is_interleaved_ = (flags & FLAG_INTERLEAVED) != 0;
     is_orthogonal_rotation_ = (flags & FLAG_ORTHOGONAL_ROTATION) != 0;
 
     alignment_ = *reinterpret_cast<const uint32_t*>(ptr + offset);
