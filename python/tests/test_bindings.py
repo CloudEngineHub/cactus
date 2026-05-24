@@ -326,7 +326,7 @@ class TestCliParser:
     def test_convert_command(self):
         args = self.parser.parse_args(["convert", "qwen", "--bits", "2"])
         assert args.command == "convert"
-        assert args.model_name == "qwen"
+        assert args.model_id == "qwen"
         assert args.bits == 2
 
     def test_build_command(self):
