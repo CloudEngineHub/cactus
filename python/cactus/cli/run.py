@@ -41,12 +41,14 @@ def cmd_run(args):
         print_color(RED, "Chat binary not found. Run `cactus build` first.")
         return 1
 
+    image_file = next((image for image in getattr(args, 'image_file', []) if image), None)
+
     cmd = [str(chat), str(bundle_dir)]
     for flag, value in (
-        ("--system", args.system),
-        ("--prompt", args.prompt),
-        ("--image", args.image),
-        ("--audio", args.audio),
+        ("--system", getattr(args, 'system', None)),
+        ("--prompt", getattr(args, 'prompt', None)),
+        ("--image", getattr(args, 'image', None) or image_file),
+        ("--audio", getattr(args, 'audio', None) or getattr(args, 'audio_file', None)),
     ):
         if value:
             cmd.extend([
@@ -55,7 +57,14 @@ def cmd_run(args):
                 if flag in ("--image", "--audio")
                 else str(value),
             ])
-    if args.thinking:
+    for flag, value in (
+        ("--input-ids", getattr(args, 'input_ids', None)),
+        ("--max-new-tokens", getattr(args, 'max_new_tokens', None)),
+        ("--result-json", getattr(args, 'result_json', None)),
+    ):
+        if value is not None:
+            cmd.extend([flag, str(value)])
+    if getattr(args, 'thinking', False):
         cmd.append("--thinking")
 
     print_color(GREEN, f"Starting Cactus Chat with model: {bundle_dir}")

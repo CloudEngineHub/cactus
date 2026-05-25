@@ -200,7 +200,6 @@ def test_cmd_convert_supplies_default_audio_for_whisper(monkeypatch, tmp_path: P
     assert extra_args[extra_args.index("--task") + 1] == "seq2seq_transcription"
     assert "--audio-file" in extra_args
 
-
 def test_cmd_convert_infers_multimodal_for_qwen_and_lfm(monkeypatch, tmp_path: Path) -> None:
     """Qwen/LFM models WITH vision_config get multimodal task."""
     parser = cli.create_parser()
@@ -208,9 +207,21 @@ def test_cmd_convert_infers_multimodal_for_qwen_and_lfm(monkeypatch, tmp_path: P
     import cactus.convert.cli as cq_cli
     import cactus.cli.transpile as transpile_mod
 
-    for alias, model_type, arch, vision in (
-        ("qwen", "qwen3", "Qwen3ForCausalLM", "qwen3_vision"),
-        ("lfm", "lfm2_vl", "Lfm2VlForConditionalGeneration", "siglip2_vision_model"),
+    for alias, model_type, arch, vision, expected_components in (
+        (
+            "qwen",
+            "qwen3",
+            "Qwen3ForCausalLM",
+            "qwen3_vision",
+            "vision_encoder,lm_encoder,decoder,lm_encoder_text_chunk,decoder_prefill_chunk,lm_encoder_step,decoder_media_step,decoder_step",
+        ),
+        (
+            "lfm",
+            "lfm2_vl",
+            "Lfm2VlForConditionalGeneration",
+            "siglip2_vision_model",
+            "vision_encoder,lm_encoder,decoder",
+        ),
     ):
         output_dir = tmp_path / (alias + "_mm")
         args = parser.parse_args(["convert", alias, str(output_dir), "--reconvert"])
@@ -237,6 +248,10 @@ def test_cmd_convert_infers_multimodal_for_qwen_and_lfm(monkeypatch, tmp_path: P
         assert rc == 0
         extra_args = transpile_calls[0].extra_args
         assert extra_args[extra_args.index("--task") + 1] == "multimodal_causal_lm_logits"
+        assert extra_args[extra_args.index("--component-pipeline") + 1] == "on"
+        assert extra_args[extra_args.index("--components") + 1] == expected_components
+        assert "--image-file" in extra_args
+        assert "--audio-file" not in extra_args
 
 
 def test_cmd_convert_infers_causal_lm_for_qwen_and_lfm_without_vision(monkeypatch, tmp_path: Path) -> None:

@@ -183,6 +183,14 @@ def cmd_build(args):
     if result.returncode != 0:
         print_color(RED, "Failed to build cactus library")
         return 1
+    for _ in range(50):
+        if lib_path.exists():
+            break
+        import time
+        time.sleep(0.1)
+    if not lib_path.exists():
+        print_color(RED, f"Build did not produce {lib_path}")
+        return 1
 
     sdl2 = _detect_sdl2()
     if sdl2[0]:

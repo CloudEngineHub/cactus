@@ -170,10 +170,20 @@ def create_parser():
                             help="Path to image file for VLM inference (attached to first message)")
     run_parser.add_argument("--audio",
                             help="Path to audio file (WAV) for audio chat (attached to first message)")
+    run_parser.add_argument("--file", dest="audio_file", default=None,
+                            help="Audio file for transpiled bundles")
+    run_parser.add_argument("--image-file", action="append", default=[],
+                            help="Repeatable image input for transpiled bundles")
     run_parser.add_argument("--system",
                             help="System prompt to prepend to all messages")
     run_parser.add_argument("--prompt",
                             help="Initial prompt to send immediately")
+    run_parser.add_argument("--input-ids", default=None,
+                            help="Comma-separated token ids for transpiled causal-LM bundles")
+    run_parser.add_argument("--max-new-tokens", type=int, default=None,
+                            help="Maximum tokens to generate for transpiled causal-LM bundles")
+    run_parser.add_argument("--result-json", default=None,
+                            help="Optional path to save transpiled bundle results as JSON")
     run_parser.add_argument("--thinking", action="store_true",
                             help="Enable thinking/reasoning for models that support it")
 
