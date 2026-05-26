@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .common import (
     PROJECT_ROOT,
-    print_color, mask_key,
+    print_color,
     GREEN, YELLOW, BLUE,
 )
 
@@ -43,34 +43,18 @@ def cmd_clean(args):
     else:
         print(f"Telemetry cache not found: {telemetry_cache}")
 
-    from .config_utils import CactusConfig
-    config = CactusConfig()
-    saved_key = config.load_config().get("api_key", "")
-    if saved_key:
-        config.cache_api_key(saved_key)
-        print(f"Restored cached API key: {mask_key(saved_key)}")
-
     print()
     print("Removing compiled libraries and frameworks...")
 
     preserve_roots = [
-        PROJECT_ROOT / "cactus-engine" / "libs" / "curl",
-        PROJECT_ROOT / "android" / "mbedtls",
-        PROJECT_ROOT / "libs" / "mbedtls",
+        (PROJECT_ROOT / "cactus-engine" / "libs" / "curl").resolve(),
+        (PROJECT_ROOT / "android" / "mbedtls").resolve(),
+        (PROJECT_ROOT / "libs" / "mbedtls").resolve(),
     ]
 
     def should_preserve_artifact(path):
-        try:
-            resolved = path.resolve()
-        except FileNotFoundError:
-            return False
-        for root in preserve_roots:
-            try:
-                if resolved.is_relative_to(root.resolve()):
-                    return True
-            except FileNotFoundError:
-                continue
-        return False
+        resolved = path.resolve()
+        return any(resolved.is_relative_to(root) for root in preserve_roots)
 
     so_count = 0
     for so_file in PROJECT_ROOT.rglob("*.so"):

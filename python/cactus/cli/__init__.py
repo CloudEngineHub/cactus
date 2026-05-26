@@ -1,6 +1,7 @@
 import sys
 import argparse
 
+from .. import __version__
 from .common import (
     DEFAULT_MODEL_ID,
     DEFAULT_TEST_MODEL_ID,
@@ -132,6 +133,8 @@ def create_parser():
 """
     )
 
+    parser.add_argument("--version", action="version", version=f"cactus {__version__}")
+
     subparsers = parser.add_subparsers(dest='command')
     subparsers.required = False
 
@@ -150,12 +153,13 @@ def create_parser():
 
     # ── build ─────────────────────────────────────────────────────────
     build_parser = subparsers.add_parser("build", help="Build the chat application")
-    build_parser.add_argument("--apple", action="store_true",
-                              help="Build for Apple platforms (iOS/macOS)")
-    build_parser.add_argument("--android", action="store_true",
-                              help="Build for Android")
-    build_parser.add_argument("--python", action="store_true",
-                              help="Build shared library for Python FFI")
+    build_group = build_parser.add_mutually_exclusive_group()
+    build_group.add_argument("--apple", action="store_true",
+                             help="Build for Apple platforms (iOS/macOS)")
+    build_group.add_argument("--android", action="store_true",
+                             help="Build for Android")
+    build_group.add_argument("--python", action="store_true",
+                             help="Build shared library for Python FFI")
 
     # ── run ───────────────────────────────────────────────────────────
     run_parser = subparsers.add_parser("run", help="Build, download (if needed), and run chat",
@@ -170,10 +174,6 @@ def create_parser():
                             help="Path to image file for VLM inference (attached to first message)")
     run_parser.add_argument("--audio",
                             help="Path to audio file (WAV) for audio chat (attached to first message)")
-    run_parser.add_argument("--file", dest="audio_file", default=None,
-                            help="Audio file for transpiled bundles")
-    run_parser.add_argument("--image-file", action="append", default=[],
-                            help="Repeatable image input for transpiled bundles")
     run_parser.add_argument("--system",
                             help="System prompt to prepend to all messages")
     run_parser.add_argument("--prompt",
@@ -192,7 +192,7 @@ def create_parser():
                                               parents=[_telemetry_parent()])
     transcribe_parser.add_argument("model_id", nargs="?", default=DEFAULT_ASR_MODEL_ID,
                                    help=f"HuggingFace model ID (default: {DEFAULT_ASR_MODEL_ID})")
-    transcribe_parser.add_argument("--file", dest="audio_file", default=None,
+    transcribe_parser.add_argument("--file", dest="audio_file", required=True,
                                    help="Audio file to transcribe (WAV format)")
     transcribe_parser.add_argument("--language", default="en",
                                    help="Language code for transcription (default: en). Examples: es, fr, de, zh, ja")

@@ -38,10 +38,8 @@ def test_cmd_run_forwards_chunked_bundle_flags(monkeypatch, tmp_path: Path) -> N
         reconvert=False,
         system=None,
         prompt="hi",
-        image=None,
-        image_file=[str(image_file)],
-        audio=None,
-        audio_file=str(audio_file),
+        image=str(image_file),
+        audio=str(audio_file),
         input_ids="1,2,3",
         max_new_tokens=4,
         result_json=str(result_json),
@@ -53,8 +51,8 @@ def test_cmd_run_forwards_chunked_bundle_flags(monkeypatch, tmp_path: Path) -> N
     cmd = calls[0]
     assert cmd[:2] == [str(fake_chat), str(bundle_dir)]
     assert cmd[cmd.index("--prompt") + 1] == "hi"
-    assert cmd[cmd.index("--image") + 1] == str(image_file.resolve())
-    assert cmd[cmd.index("--audio") + 1] == str(audio_file.resolve())
+    assert cmd[cmd.index("--image") + 1] == str(image_file)
+    assert cmd[cmd.index("--audio") + 1] == str(audio_file)
     assert cmd[cmd.index("--input-ids") + 1] == "1,2,3"
     assert cmd[cmd.index("--max-new-tokens") + 1] == "4"
     assert cmd[cmd.index("--result-json") + 1] == str(result_json)

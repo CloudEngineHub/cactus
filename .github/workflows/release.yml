@@ -41,18 +41,20 @@ jobs:
               raise RuntimeError(f"Package not available at {url}")
 
           formula = f'''class Cactus < Formula
-            include Language::Python::Virtualenv
             desc "On-device AI inference"
             homepage "https://cactuscompute.com"
             url "{url}"
             sha256 "{sha}"
             license "Cactus Compute License"
+            include Language::Python::Virtualenv
             depends_on "python@3.12"
             def install
-              virtualenv_install_with_resources
+              venv = virtualenv_create(libexec, "python3.12")
+              venv.pip_install "cactus-compute==#{{version}}"
+              bin.install_symlink libexec/"bin/cactus"
             end
             test do
-              system bin/"cactus", "--help"
+              assert_equal "cactus #{{version}}\\n", shell_output("#{{bin}}/cactus --version")
             end
           end
           '''

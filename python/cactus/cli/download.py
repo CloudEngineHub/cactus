@@ -31,12 +31,11 @@ def ensure_model(model_id):
 
 def cmd_download(args):
     """Download original model weights from HuggingFace."""
-    from .model import resolve_model_id, download_model
+    from .model import download_model
     from .common import print_color, RED
 
-    model_id = resolve_model_id(args.model_id)
     try:
-        download_model(model_id, token=args.token, cache_dir=args.cache_dir)
+        download_model(args.model_id, token=args.token, cache_dir=args.cache_dir)
         return 0
     except (RuntimeError, OSError) as e:
         print_color(RED, f"Download failed: {e}")

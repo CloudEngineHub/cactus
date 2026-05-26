@@ -14,26 +14,7 @@ def _looks_like_project_root(path):
     )
 
 
-def _resolve_project_root():
-    env_root = os.getenv("CACTUS_PROJECT_ROOT", "").strip()
-    if env_root:
-        candidate = Path(env_root).expanduser().resolve()
-        if _looks_like_project_root(candidate):
-            return candidate
-
-    module_root = SCRIPT_DIR.parent.parent.parent
-    if _looks_like_project_root(module_root):
-        return module_root
-
-    cwd = Path.cwd().resolve()
-    for candidate in [cwd, *cwd.parents]:
-        if _looks_like_project_root(candidate):
-            return candidate
-
-    return module_root
-
-
-PROJECT_ROOT = _resolve_project_root()
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
 
 
 def is_repo_checkout():

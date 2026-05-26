@@ -8,25 +8,6 @@ from pathlib import Path
 from .common import GREEN, PROJECT_ROOT, YELLOW, print_color
 
 
-# ── Model ID aliases (single source of truth) ────────────────────────
-
-MODEL_ID_ALIASES = {
-    "gemma4":       "google/gemma-4-E2B-it",
-    "gemma4-e2b":   "google/gemma-4-E2B-it",
-    "parakeet":     "nvidia/parakeet-tdt-0.6b-v3",
-    "parakeet-tdt": "nvidia/parakeet-tdt-0.6b-v3",
-    "whisper":      "openai/whisper-small",
-    "qwen":         "Qwen/Qwen3-1.7B",
-    "lfm":          "LiquidAI/LFM2-VL-450M",
-}
-
-
-def resolve_model_id(raw):
-    """Normalize alias -> canonical HuggingFace model ID."""
-    normalized = (raw or "").strip()
-    return MODEL_ID_ALIASES.get(normalized.lower(), normalized)
-
-
 # ── Weight download / conversion ──────────────────────────────────────
 
 
@@ -238,6 +219,17 @@ _AUDIO_TASKS = frozenset({
 # ── Bundle preparation (weights + transpile) ──────────────────────────
 
 
+def resolve_bundle_dir(model_id):
+    path = Path(model_id).expanduser()
+    if not path.is_dir():
+        return None
+    if (path / "components" / "manifest.json").exists():
+        return path
+    if path.name == "components" and (path / "manifest.json").exists():
+        return path.parent
+    return None
+
+
 @dataclass(frozen=True)
 class TranspileOptions:
     """Transpile-phase parameters for ensure_bundle."""
@@ -258,7 +250,7 @@ def ensure_bundle(model_id, *, bits=4, token=None, cache_dir=None,
     """Return path to transpiled bundle, creating it if needed.
     """
     from .download import get_weights_dir
-    from .transpile import cmd_transpile
+    from .transpile import run_transpile
     from cactus.transpile.component_plan import infer_component_plan_from_output
 
     opts = transpile or TranspileOptions()
@@ -338,7 +330,7 @@ def ensure_bundle(model_id, *, bits=4, token=None, cache_dir=None,
     elif spec.task in _AUDIO_TASKS and not spec_audio_file:
         raise RuntimeError(f"{spec.task} transpile requires --audio-file.")
 
-    # Step 5: build transpile args and call cmd_transpile
+    # Step 5: build transpile args and call run_transpile
     effective_max_new_tokens = opts.max_new_tokens or _default_max_new_tokens(spec.task)
 
     extra_args = [
@@ -365,14 +357,7 @@ def ensure_bundle(model_id, *, bits=4, token=None, cache_dir=None,
     if opts.local_files_only:
         extra_args.append("--local-files-only")
 
-    import argparse
-    transpile_ns = argparse.Namespace(
-        model_id=model_id,
-        execute_after_transpile=False,
-        allow_unconverted_weights=False,
-        extra_args=extra_args,
-    )
-    rc = cmd_transpile(transpile_ns)
+    rc = run_transpile(model_id, extra_args=extra_args)
     if rc != 0:
         raise RuntimeError(f"Transpilation failed for {model_id}")
 
