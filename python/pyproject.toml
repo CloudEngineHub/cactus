@@ -63,7 +63,7 @@ include = ["cactus*"]
 
 [tool.setuptools.package-data]
 "cactus.bindings" = ["lib/*.dylib", "lib/*.so"]
-"cactus" = ["bin/chat", "bin/asr"]
+"cactus" = ["bin/chat", "bin/asr", "assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

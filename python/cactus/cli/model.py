@@ -124,12 +124,15 @@ def _default_max_new_tokens(task):
 
 def _default_multimodal_assets():
     """Return bundled test image/audio paths for multimodal shape capture."""
-    assets_dir = PROJECT_ROOT / "cactus-engine" / "tests" / "assets"
-    image_file = assets_dir / "test_monkey.png"
-    audio_file = assets_dir / "test.wav"
-    image_args = [str(image_file)] if image_file.exists() else []
-    audio_arg = str(audio_file) if audio_file.exists() else None
-    return image_args, audio_arg
+    candidates = (
+        Path(__file__).resolve().parent.parent / "assets",
+        PROJECT_ROOT / "cactus-engine" / "tests" / "assets",
+    )
+    def _find(name):
+        return next((d / name for d in candidates if (d / name).exists()), None)
+    image = _find("test_monkey.png")
+    audio = _find("test.wav")
+    return ([str(image)] if image else []), (str(audio) if audio else None)
 
 
 def _default_audio_asset():
