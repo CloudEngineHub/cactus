@@ -283,7 +283,7 @@ class TestCliParser:
     def test_download_defaults(self):
         args = self.parser.parse_args(["download"])
         assert args.token is None
-        assert args.cache_dir is None
+        assert args.bits == 4
 
     def test_run_command(self):
         args = self.parser.parse_args(["run", "gemma4", "--prompt", "hi"])

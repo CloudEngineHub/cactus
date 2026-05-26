@@ -34,7 +34,6 @@ def test_cmd_run_forwards_chunked_bundle_flags(monkeypatch, tmp_path: Path) -> N
         no_cloud_tele=False,
         model_id=str(bundle_dir),
         token=None,
-        cache_dir=None,
         reconvert=False,
         system=None,
         prompt="hi",

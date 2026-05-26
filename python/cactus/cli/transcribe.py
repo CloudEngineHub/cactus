@@ -29,7 +29,6 @@ def cmd_transcribe(args):
             bundle_dir = ensure_bundle(
                 args.model_id,
                 token=args.token,
-                cache_dir=args.cache_dir,
                 reconvert=args.reconvert,
                 transpile=TranspileOptions(audio_file=args.audio_file),
             )

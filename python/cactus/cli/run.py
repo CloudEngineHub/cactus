@@ -22,7 +22,6 @@ def cmd_run(args):
             bundle_dir = ensure_bundle(
                 args.model_id,
                 token=args.token,
-                cache_dir=args.cache_dir,
                 reconvert=args.reconvert,
                 transpile=TranspileOptions(
                     image_files=[args.image] if args.image else None,

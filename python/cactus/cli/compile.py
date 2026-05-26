@@ -189,10 +189,10 @@ def cmd_build(args):
 
     sdl2 = _detect_sdl2()
     if sdl2[0]:
-        print_color(GREEN, "SDL2 found - building with live audio support")
+        print_color(GREEN, "SDL2 found - chat voice input enabled")
     else:
-        print_color(YELLOW, "SDL2 not found - live mic recording will be disabled")
-        print_color(YELLOW, "Install SDL2 for live mic support: brew install sdl2 (macOS)")
+        print_color(YELLOW, "SDL2 not found - chat voice input disabled")
+        print_color(YELLOW, "Install SDL2 to enable chat voice input: brew install sdl2 (macOS)")
 
     rc = build_binary("chat", lib_path, sdl2=sdl2)
     if rc != 0:

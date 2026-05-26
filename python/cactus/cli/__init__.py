@@ -52,7 +52,6 @@ def create_parser():
     --system <prompt>                  system prompt
     --prompt <text>                    send prompt immediately
     --thinking                         enable reasoning
-    --cache-dir <path>                 cache directory for HuggingFace models
     --token <token>                    HF token (for gated models)
     --reconvert                        force reconversion from source
 
@@ -64,30 +63,27 @@ def create_parser():
     Optional flags:
     --file <audio.wav>                 audio file to transcribe
     --language <code>                  language code (default: en)
-    --cache-dir <path>                 cache directory for HuggingFace models
     --token <token>                    HF token (for gated models)
     --reconvert                        force reconversion from source
 
   -----------------------------------------------------------------
 
-  cactus convert <model> [output_dir]  converts and transpiles HuggingFace model
-                                       downloads pre-converted from Cactus-Compute
-                                       if available, otherwise converts locally
+  cactus download <model>              fetch pre-converted CQ from Cactus-Compute
 
     Optional flags:
-    --bits 1|2|3|4                     CQ quantization bits (default: 4)
-    --cache-dir <path>                 cache directory for HuggingFace models
+    --bits 1|2|3|4                     CQ quantization (default: 4)
     --token <token>                    HuggingFace API token
-    --reconvert                        force local conversion
 
   -----------------------------------------------------------------
 
-  cactus download <model>              downloads raw model weights from HuggingFace
-                                       use 'cactus convert' to make them runnable
+  cactus convert <model> [dir]         convert model to CQ format
+                                       (pre-converted if available, else
+                                       built from source)
 
     Optional flags:
-    --cache-dir <path>                 cache directory for HuggingFace models
+    --bits 1|2|3|4                     CQ quantization (default: 4)
     --token <token>                    HuggingFace API token
+    --reconvert                        force build from source
 
   -----------------------------------------------------------------
 
@@ -145,10 +141,12 @@ def create_parser():
     parser._action_groups = []
 
     # ── download ──────────────────────────────────────────────────────
-    download_parser = subparsers.add_parser("download", help="Download model from HuggingFace")
+    download_parser = subparsers.add_parser("download",
+                                            help="Fetch pre-converted CQ weights from huggingface.co/Cactus-Compute")
     download_parser.add_argument("model_id", nargs="?", default=DEFAULT_MODEL_ID,
                                  help=f"HuggingFace model ID (default: {DEFAULT_MODEL_ID})")
-    download_parser.add_argument("--cache-dir", help="Cache directory for HuggingFace models")
+    download_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
+                                 help="CQ quantization bits (default: 4)")
     download_parser.add_argument("--token", help="HuggingFace API token")
 
     # ── build ─────────────────────────────────────────────────────────
@@ -166,7 +164,6 @@ def create_parser():
                                        parents=[_telemetry_parent()])
     run_parser.add_argument("model_id", nargs="?", default=DEFAULT_MODEL_ID,
                             help=f"HuggingFace model ID (default: {DEFAULT_MODEL_ID})")
-    run_parser.add_argument("--cache-dir", help="Cache directory for HuggingFace models")
     run_parser.add_argument("--token", help="HuggingFace API token")
     run_parser.add_argument("--reconvert", action="store_true",
                             help="Force conversion from source")
@@ -196,7 +193,6 @@ def create_parser():
                                    help="Audio file to transcribe (WAV format)")
     transcribe_parser.add_argument("--language", default="en",
                                    help="Language code for transcription (default: en). Examples: es, fr, de, zh, ja")
-    transcribe_parser.add_argument("--cache-dir", help="Cache directory for HuggingFace models")
     transcribe_parser.add_argument("--token", help="HuggingFace API token")
     transcribe_parser.add_argument("--force-handoff", action="store_true",
                                    help=argparse.SUPPRESS)
@@ -238,7 +234,6 @@ def create_parser():
                                 help="Output directory (default: weights/<model_name>)")
     convert_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
                                 help="CQ quantization bits (default: 4)")
-    convert_parser.add_argument("--cache-dir", help="Cache directory for HuggingFace models")
     convert_parser.add_argument("--token", help="HuggingFace API token")
     convert_parser.add_argument("--task", default="auto",
                                 choices=["auto", "causal_lm_logits", "multimodal_causal_lm_logits",

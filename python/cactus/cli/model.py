@@ -11,55 +11,7 @@ from .common import GREEN, PROJECT_ROOT, YELLOW, print_color
 # ── Weight download / conversion ──────────────────────────────────────
 
 
-def download_model(model_id, *, token=None, cache_dir=None):
-    """Download raw model weights from HuggingFace."""
-    from .download import get_weights_dir
-
-    weights_dir = get_weights_dir(model_id)
-
-    print()
-    print_color(YELLOW, f"Downloading {model_id} from HuggingFace...")
-    print("=" * 45)
-
-    from huggingface_hub import snapshot_download
-    snapshot_download(
-        repo_id=model_id,
-        token=token,
-        cache_dir=cache_dir,
-        local_dir=str(weights_dir),
-    )
-    print_color(GREEN, f"Model downloaded to {weights_dir}")
-    return weights_dir
-
-
-def _try_cq_download(model_id, *, bits, token, cache_dir, weights_dir):
-    """Try pre-converted CQ weights from Cactus-Compute. Returns path or None."""
-    from .download import get_model_dir_name
-    from .utils import (
-        download_cq_archive,
-        list_hf_cq_archives,
-        resolve_archive,
-        suggested_cq_repo,
-    )
-
-    cq_repo_id = suggested_cq_repo(model_id)
-    try:
-        archives = list_hf_cq_archives(cq_repo_id, token=token)
-        if not archives:
-            return None
-        local_name = get_model_dir_name(model_id)
-        resolution = resolve_archive(cq_repo_id, local_name, archives, bits)
-        size_mb = f" ({resolution.archive.size / (1024 * 1024):.1f} MiB)" if resolution.archive.size else ""
-        print(f"  Downloading pre-converted {resolution.archive.filename} [cq{bits}]{size_mb}")
-        download_cq_archive(resolution, weights_dir, token=token, cache_dir=cache_dir)
-        print_color(GREEN, f"CQ model ready at {weights_dir}")
-        return weights_dir
-    except (RuntimeError, OSError) as exc:
-        print(f"  Pre-converted CQ not available ({exc})")
-        return None
-
-
-def _convert_from_source(model_id, *, bits, token, cache_dir, weights_dir):
+def _convert_from_source(model_id, *, bits, token, weights_dir):
     """Download from HuggingFace and run CQ conversion."""
     print_color(YELLOW, f"Converting {model_id} from HuggingFace source...")
     from ..convert.cli import main as cq_main
@@ -72,18 +24,19 @@ def _convert_from_source(model_id, *, bits, token, cache_dir, weights_dir):
     ]
     if token:
         cq_args.extend(["--token", token])
-    if cache_dir:
-        cq_args.extend(["--cache-dir", cache_dir])
     cq_main(cq_args)
 
     print_color(GREEN, f"Model converted and ready at {weights_dir}")
     return weights_dir
 
 
-def ensure_weights(model_id, *, bits=4, token=None, cache_dir=None,
-                   reconvert=False, output_dir=None):
-    """Return path to CQ weights dir, converting as needed."""
-    from .download import get_weights_dir
+def ensure_weights(model_id, *, bits=4, token=None, reconvert=False, output_dir=None):
+    """Return path to CQ weights dir, downloading or converting as needed.
+
+    Fast path: pull a pre-converted CQ archive from huggingface.co/Cactus-Compute.
+    Fallback: ``--reconvert`` or no archive available → build from source.
+    """
+    from .download import get_weights_dir, download_cq_weights
 
     weights_dir = Path(output_dir) if output_dir else get_weights_dir(model_id)
 
@@ -96,13 +49,14 @@ def ensure_weights(model_id, *, bits=4, token=None, cache_dir=None,
         return weights_dir
 
     if not reconvert:
-        result = _try_cq_download(model_id, bits=bits, token=token,
-                                  cache_dir=cache_dir, weights_dir=weights_dir)
-        if result is not None:
-            return result
+        try:
+            return download_cq_weights(
+                model_id, bits=bits, token=token, output_dir=weights_dir,
+            )
+        except (RuntimeError, OSError) as exc:
+            print(f"  Pre-converted CQ not available ({exc})")
 
-    return _convert_from_source(model_id, bits=bits, token=token,
-                                cache_dir=cache_dir, weights_dir=weights_dir)
+    return _convert_from_source(model_id, bits=bits, token=token, weights_dir=weights_dir)
 
 
 # ── Transpile spec helpers ────────────────────────────────────────────
@@ -245,7 +199,7 @@ class TranspileOptions:
     local_files_only: bool = False
 
 
-def ensure_bundle(model_id, *, bits=4, token=None, cache_dir=None,
+def ensure_bundle(model_id, *, bits=4, token=None,
                   reconvert=False, output_dir=None, transpile=None):
     """Return path to transpiled bundle, creating it if needed.
     """
@@ -263,8 +217,7 @@ def ensure_bundle(model_id, *, bits=4, token=None, cache_dir=None,
     # Step 1: ensure CQ weights exist
     ensure_weights(
         model_id, bits=bits, token=token,
-        cache_dir=cache_dir, reconvert=reconvert,
-        output_dir=output_dir,
+        reconvert=reconvert, output_dir=output_dir,
     )
 
     # Step 2: skip if already transpiled

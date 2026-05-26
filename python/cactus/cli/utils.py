@@ -193,13 +193,13 @@ def verify_archive_sha256(archive_path: Path, expected_sha256: str | None) -> No
         )
 
 
-def _download_with_urllib(resolution: CqResolution, *, token=None, cache_dir=None, revision=None) -> Path:
+def _download_with_urllib(resolution: CqResolution, *, token=None, revision=None) -> Path:
     quoted_repo = urllib.parse.quote(resolution.repo_id, safe="")
     quoted_file = urllib.parse.quote(resolution.archive.filename)
     revision = revision or "main"
     url = f"https://huggingface.co/{resolution.repo_id}/resolve/{urllib.parse.quote(str(revision), safe='')}/{quoted_file}"
 
-    cache_root = Path(cache_dir).expanduser() if cache_dir else Path(tempfile.gettempdir()) / "cactus-cq-cache"
+    cache_root = Path(tempfile.gettempdir()) / "cactus-cq-cache"
     archive_dir = cache_root / quoted_repo / str(revision)
     archive_dir.mkdir(parents=True, exist_ok=True)
     archive_path = archive_dir / Path(resolution.archive.filename).name
@@ -234,7 +234,7 @@ def write_download_metadata(output_dir: Path, resolution: CqResolution, archive_
 
 
 def download_cq_archive(resolution: CqResolution, output_dir: Path, *, token=None,
-                        cache_dir=None, revision=None, force=False, dry_run=False) -> Path:
+                        revision=None, force=False, dry_run=False) -> Path:
     if dry_run:
         return output_dir
 
@@ -252,14 +252,12 @@ def download_cq_archive(resolution: CqResolution, output_dir: Path, *, token=Non
             filename=resolution.archive.filename,
             repo_type="model",
             token=token,
-            cache_dir=cache_dir,
             revision=revision,
         ))
     except ImportError:
         archive_path = _download_with_urllib(
             resolution,
             token=token,
-            cache_dir=cache_dir,
             revision=revision,
         )
     verify_archive_sha256(archive_path, resolution.archive.sha256)
