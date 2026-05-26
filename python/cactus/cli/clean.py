@@ -32,6 +32,8 @@ def cmd_clean(args):
 
     remove_if_exists(PROJECT_ROOT / "tests" / "build")
 
+    remove_if_exists(PROJECT_ROOT / "python" / "cactus" / "bin")
+
     remove_if_exists(PROJECT_ROOT / "venv")
 
     remove_if_exists(PROJECT_ROOT / "weights")
@@ -63,23 +65,26 @@ def cmd_clean(args):
     print(f"Removed {so_count} .so files" if so_count else "No .so files found")
 
     a_count = 0
-    a_preserved_count = 0
     for a_file in PROJECT_ROOT.rglob("*.a"):
         if should_preserve_artifact(a_file):
-            a_preserved_count += 1
             continue
         a_file.unlink()
         a_count += 1
-    if a_count or a_preserved_count:
-        print(f"Removed {a_count} .a files (preserved {a_preserved_count} vendored static libs)")
-    else:
-        print("No .a files found")
+    print(f"Removed {a_count} .a files" if a_count else "No .a files found")
 
     bin_count = 0
     for bin_file in PROJECT_ROOT.rglob("*.bin"):
         bin_file.unlink()
         bin_count += 1
     print(f"Removed {bin_count} .bin files" if bin_count else "No .bin files found")
+
+    dylib_count = 0
+    for dylib_file in PROJECT_ROOT.rglob("*.dylib"):
+        if should_preserve_artifact(dylib_file):
+            continue
+        dylib_file.unlink()
+        dylib_count += 1
+    print(f"Removed {dylib_count} .dylib files" if dylib_count else "No .dylib files found")
 
     xcf_count = 0
     for xcf_dir in PROJECT_ROOT.rglob("*.xcframework"):
