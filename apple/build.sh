@@ -7,7 +7,7 @@ APPLE_DIR="$ROOT_DIR/apple"
 CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-Release}
 BUILD_STATIC=${BUILD_STATIC:-true}
 BUILD_XCFRAMEWORK=${BUILD_XCFRAMEWORK:-true}
-CACTUS_CURL_ROOT=${CACTUS_CURL_ROOT:-"$ROOT_DIR/libs/curl"}
+CACTUS_CURL_ROOT=${CACTUS_CURL_ROOT:-"$ROOT_DIR/cactus-engine/libs/curl"}
 
 if ! command -v cmake &> /dev/null; then
     echo "Error: cmake not found, please install it"
@@ -31,11 +31,7 @@ echo "Vendored libcurl root: $CACTUS_CURL_ROOT"
 
 function cp_headers() {
     mkdir -p "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers"
-    cp "$ROOT_DIR/cactus/ffi/"*.h "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers/" 2>/dev/null || true
-    cp "$ROOT_DIR/cactus/engine/"*.h "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers/" 2>/dev/null || true
-    cp "$ROOT_DIR/cactus/graph/"*.h "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers/" 2>/dev/null || true
-    cp "$ROOT_DIR/cactus/kernel/"*.h "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers/" 2>/dev/null || true
-    cp "$ROOT_DIR/cactus/"*.h "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers/" 2>/dev/null || true
+    cp "$ROOT_DIR/cactus-engine/cactus_engine.h" "$ROOT_DIR/apple/$1/$2/cactus.framework/Headers/"
 }
 
 function create_ios_xcframework_info_plist() {

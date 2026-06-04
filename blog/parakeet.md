@@ -153,7 +153,7 @@ Cactus handles downloading and converting HuggingFace models to its optimized bi
 cactus download nvidia/parakeet-ctc-1.1b
 ```
 
-### 4. Use the [Python SDK](/python/)
+### 4. Use the [Python Binding](/python/)
 
 For integrating Parakeet into your own applications, use the Python FFI bindings directly:
 
@@ -177,65 +177,12 @@ print(f"Decode speed: {result['decode_tps']:.1f} tokens/sec")
 cactus_destroy(model)
 ```
 
-Cactus also supports streaming for constant transcription. Below is a code snippet that uses the computer's mic to transcribe audio on-device. Note that sample rate is 16000 hz for Parakeet, and that each block is one second long to allow the model to have enough context to accurately transcribe the audio stream.
-
-Minimal streaming example using your computer mic (`Ctrl+C` to stop):
-
-```python
-import json
-import queue
-
-import sounddevice as sd
-from cactus import (
-    cactus_init,
-    cactus_stream_transcribe_start,
-    cactus_stream_transcribe_process,
-    cactus_stream_transcribe_stop,
-    cactus_destroy,
-)
-
-model = cactus_init("weights/parakeet-ctc-1.1b", None, False)
-stream = cactus_stream_transcribe_start(
-    model,
-    json.dumps({"min_chunk_size": 16000, "language": "en"}),
-)
-
-audio_q = queue.Queue()
-
-def on_audio(indata, _frames, _time_info, status):
-    audio_q.put(bytes(indata))
-
-print("Listening... press Ctrl+C to stop.")
-with sd.RawInputStream(
-    samplerate=16000,
-    blocksize=16000,  # 1 second callbacks
-    channels=1,
-    dtype="int16",
-    callback=on_audio,
-):
-    try:
-        while True:
-            pcm_chunk = audio_q.get()
-            out = json.loads(cactus_stream_transcribe_process(stream, pcm_chunk))
-            if out.get("confirmed"):
-                print(out["confirmed"], end="\n", flush=True)
-            if out.get("pending"):
-                print(out["pending"], end="\r", flush=True)
-    except KeyboardInterrupt:
-        pass
-
-final = json.loads(cactus_stream_transcribe_stop(stream))
-print(final["confirmed"], end="\n", flush=True)
-
-cactus_destroy(model)
-```
-
 ### 5. Use the [C API](/docs/cactus_engine.md)
 
-The C API is the base layer all other SDKs build on. Link against `libcactus` and include the FFI header:
+The C API is the base layer all other bindings build on. Link against `libcactus` and include the FFI header:
 
 ```c
-#include "cactus_ffi.h"
+#include "cactus_engine.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -256,24 +203,7 @@ int main() {
 }
 ```
 
-Streaming works the same way — start a stream, feed PCM chunks, then stop:
-
-```c
-cactus_stream_transcribe_t stream = cactus_stream_transcribe_start(
-    model,
-    "{\"min_chunk_size\": 16000, \"language\": \"en\"}"
-);
-
-char buf[8192];
-// In your audio callback, feed 16-bit 16kHz mono PCM:
-cactus_stream_transcribe_process(stream, pcm_data, pcm_size, buf, sizeof(buf));
-printf("Partial: %s\n", buf);
-
-cactus_stream_transcribe_stop(stream, buf, sizeof(buf));
-printf("Final: %s\n", buf);
-```
-
-### 6. Use the [Rust SDK](/rust/)
+### 6. Use the [Rust Binding](/rust/)
 
 Add `cactus-sys` to your `Cargo.toml` and call the FFI bindings directly:
 
@@ -312,9 +242,9 @@ fn main() {
 }
 ```
 
-### 7. Use the [Swift SDK](/apple/)
+### 7. Use the [Swift Binding](/bindings/swift/)
 
-The Swift SDK exposes top-level functions that map directly to the C FFI:
+The Swift binding exposes top-level functions that map directly to the C FFI:
 
 ```swift
 import Foundation
@@ -337,9 +267,9 @@ print("Final: \(finalResult)")
 cactusDestroy(model)
 ```
 
-### 8. Use the [Kotlin SDK](/android/)
+### 8. Use the [Kotlin Binding](/bindings/kotlin/)
 
-The Kotlin SDK exposes top-level functions that map directly to the C FFI:
+The Kotlin binding exposes top-level functions that map directly to the C FFI:
 
 ```kotlin
 import com.cactus.*
@@ -362,9 +292,9 @@ println("Final: $finalResult")
 cactusDestroy(model)
 ```
 
-### 9. Use the [Flutter SDK](/flutter/)
+### 9. Use the [Flutter Binding](/flutter/)
 
-The Flutter SDK brings Cactus transcription to iOS, macOS, and Android:
+The Flutter binding brings Cactus transcription to iOS, macOS, and Android:
 
 ```dart
 import 'cactus.dart';
@@ -389,7 +319,7 @@ cactusDestroy(model);
 ## See Also
 
 - [Cactus Engine API Reference](/docs/cactus_engine.md) — Full C API docs for completion, tool calling, and cloud handoff
-- [Python SDK](/python/) — Python bindings used in the examples above
+- [Python Binding](/python/) — Python bindings used in the examples above
 - [Hybrid Transcription](/blog/hybrid_transcription.md) — On-device/cloud hybrid speech transcription with Cactus
 - [LFM2-24B-A2B](/blog/lfm2_24b_a2b.md) - Reviewing LFM2 24B MoE A2B with Cactus
 - [Runtime Compatibility](/docs/compatibility.md) — Weight versioning across Cactus releases

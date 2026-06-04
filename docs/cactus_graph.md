@@ -1,7 +1,7 @@
 ---
 title: "Cactus Graph API Documentation"
-description: "Computational graph framework for building and executing tensor operations on mobile devices. Supports matrix multiplication, attention, normalization, and INT4/INT8/FP16 precision."
-keywords: ["computation graph", "tensor operations", "mobile AI", "matrix multiplication", "attention mechanism", "INT4", "INT8", "FP16"]
+description: "Computational graph framework for building and executing tensor operations on mobile devices. Supports matrix multiplication, attention, normalization, and INT8/FP16/CQ1-CQ4 precision."
+keywords: ["computation graph", "tensor operations", "mobile AI", "matrix multiplication", "attention mechanism", "INT8", "FP16", "CQ1", "CQ4"]
 ---
 
 # Cactus Graph API Documentation
@@ -35,18 +35,21 @@ cactus test
 ## Core Concepts
 
 ### Precision Types
-The framework supports three precision types for tensors:
+The framework supports the following precision types for tensors:
 
 ```cpp
 enum class Precision {
-    INT4,
     INT8,
     FP16,
-    FP32
+    FP32,
+    CQ1,
+    CQ2,
+    CQ3,
+    CQ4
 };
 ```
 
-**Note:** INT4 tensors use packed storage (2 values per byte) and automatically unpack to INT8 for computation.
+**Note:** CQ1–CQ4 are Cactus custom quantization formats.
 
 ### Graph Construction
 The `CactusGraph` class manages the computational graph:
@@ -71,7 +74,7 @@ TestUtils::FP16TestFixture fixture("Float Test");
 
 ### Basic Example
 ```cpp
-#include "cactus/graph/graph.h"
+#include "cactus_graph.h"
 
 CactusGraph graph;
 size_t a = graph.input({4}, Precision::INT8);
@@ -464,7 +467,7 @@ size_t similarity = fixture.graph().divide(dot_product, fixture.graph().multiply
 ## Best Practices
 
 ### Memory Management
-1. **Use appropriate precision**: INT4/INT8 for memory efficiency, FP16 for accuracy
+1. **Use appropriate precision**: CQ1-CQ4/INT8 for memory efficiency, FP16 for accuracy
 2. **Memory-map large tensors**: Use `mmap_embeddings()` for vocabulary tables
 3. **Reset graphs**: Call `hard_reset()` when switching between different models
 4. **External buffers**: Use `set_external_input()` to avoid copying large inputs
@@ -492,12 +495,12 @@ size_t similarity = fixture.graph().divide(dot_product, fixture.graph().multiply
 
 ### Contributing Graph Operations
 1. ** Define the op in core graph types ** 
-Add the new OpType in `cactus/graph/graph.h`
+Add the new OpType in `cactus-graph/cactus_graph.h`
 If the op needs additional parameters, add the fields to OpParams in the same file 
 
 2. ** Add a graph builder API **  
-Add a builder method in `cactus/graph/graph_builder.cpp` and its declaration in 
-`cactus/graph/graph.h`
+Add a builder method in `cactus-graph/src/builder.cpp` and its declaration in 
+`cactus-graph/cactus_graph.h`
 Follow the pattern of existing builder methods, e.g. for a new "relu" op:
 ```cpp
 size_t CactusGraph::relu(size_t input) {
@@ -506,18 +509,18 @@ size_t CactusGraph::relu(size_t input) {
 }
 ```
 3. ** Implement the op in the execution engine **
-Implement the krnel or graph op code in the relevant file, usually in `cactus/kernel/`
-Register the new op in the dispatch table in `cactus/graph/graph_execute.cpp` for the supported backends (CPU, NPU)
+Implement the kernel or graph op code in the relevant file, usually in `cactus-kernels/src/`
+Register the new op in the dispatch table in `cactus-graph/src/execute.cpp` for the supported backends (CPU, NPU)
 
 4. ** Export op in FFI bindings **
-- header: `cactus/ffi/cactus_ffi.h`
-- implementation: `cactus/ffi/cactus_ffi.cpp`
+- header: `cactus-engine/cactus_engine.h`
+- implementation: `cactus-engine/src/graph_ffi.cpp`
 
 5. ** Add python ctypes declaration ** 
-Add `_lib.cactus_graph_my_new_op.argtypes/restype` in `python/src/cactus.py`
+Add `_lib.cactus_graph_my_new_op.argtypes/restype` in `python/cactus/bindings/cactus.py`
 
 6. ** Add python graph wrapper ** 
-Add `Graph.my_new_op(...)` in `python/src/graph.py`, and optionally a Tensor
+Add `Graph.my_new_op(...)` in `python/cactus/bindings/graph.py`, and optionally a Tensor
   convenience method.
 
 7. ** Add serialization schema entry if needed **
@@ -526,7 +529,7 @@ default node, add new ParamField enum values.
 
 If the op has any graph-persistent params:
 
-- add any new ParamField enum values in cactus/graph/graph_param_io.cpp
+- add any new ParamField enum values in cactus-graph/src/param_io.cpp
 - add read/write logic for those fields
 - add the op’s schema entry in `op_schema(...)`
 

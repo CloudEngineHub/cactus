@@ -185,6 +185,6 @@ this way you can test before fully building out your apps.
 
 - [Cactus Engine API](/docs/cactus_engine.md) — Full C API reference for inference, streaming, and tool calling
 - [Runtime Compatibility](/docs/compatibility.md) — Ensure your weights match your Cactus runtime version
-- [Python SDK](/python/) — Use fine-tuned models from Python
-- [Swift SDK](/apple/) — Deploy fine-tuned models in iOS/macOS apps
-- [Kotlin/Android SDK](/android/) — Deploy fine-tuned models in Android apps
+- [Python Binding](/python/) — Use fine-tuned models from Python
+- [Swift Binding](/bindings/swift/) — Deploy fine-tuned models in iOS/macOS apps
+- [Kotlin Binding](/bindings/kotlin/) — Deploy fine-tuned models in Android apps

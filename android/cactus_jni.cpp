@@ -1,376 +1,198 @@
 #include <jni.h>
-#include <string>
-#include <vector>
-#include <android/log.h>
-#include "cactus_ffi.h"
-
-static constexpr size_t DEFAULT_BUFFER_SIZE = 65536;
-
-static const char* jstring_to_cstr(JNIEnv* env, jstring str) {
-    if (str == nullptr) return nullptr;
-    return env->GetStringUTFChars(str, nullptr);
-}
-
-static void release_jstring(JNIEnv* env, jstring str, const char* cstr) {
-    if (str != nullptr && cstr != nullptr) {
-        env->ReleaseStringUTFChars(str, cstr);
-    }
-}
+#include "cactus.h"
 
 struct TokenCallbackContext {
-    JNIEnv* env;
+    JavaVM* jvm;
     jobject callback;
     jmethodID method;
 };
 
-static void throwCactusException(JNIEnv* env, const char* message) {
-    jclass cls = env->FindClass("java/lang/RuntimeException");
-    if (cls != nullptr) env->ThrowNew(cls, message);
-}
+struct LogCallbackContext {
+    JavaVM* jvm;
+    jobject callback;
+    jmethodID method;
+};
 
-static void throwOnError(JNIEnv* env) {
-    const char* error = cactus_get_last_error();
-    throwCactusException(env, error && error[0] ? error : "Unknown error");
-}
-
-static void token_callback_bridge(const char* token, uint32_t token_id, void* user_data) {
-    if (!user_data) return;
-    auto* ctx = static_cast<TokenCallbackContext*>(user_data);
-    jstring jtoken = ctx->env->NewStringUTF(token);
-    ctx->env->CallVoidMethod(ctx->callback, ctx->method, jtoken, static_cast<jint>(token_id));
-    ctx->env->DeleteLocalRef(jtoken);
-}
+static LogCallbackContext* g_log_callback_ctx = nullptr;
 
 extern "C" {
+
+static void token_callback_bridge(const char* token, uint32_t token_id, void* user_data) {
+    auto* ctx = static_cast<TokenCallbackContext*>(user_data);
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    jint status = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (status == JNI_EDETACHED) {
+        ctx->jvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+    jstring jtoken = env->NewStringUTF(token);
+    env->CallVoidMethod(ctx->callback, ctx->method, jtoken, static_cast<jint>(token_id));
+    env->DeleteLocalRef(jtoken);
+    if (attached) ctx->jvm->DetachCurrentThread();
+}
+
+static void log_callback_bridge(int level, const char* component, const char* message, void* user_data) {
+    auto* ctx = static_cast<LogCallbackContext*>(user_data);
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    jint status = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (status == JNI_EDETACHED) {
+        ctx->jvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+    jstring jcomponent = env->NewStringUTF(component);
+    jstring jmessage = env->NewStringUTF(message);
+    env->CallVoidMethod(ctx->callback, ctx->method, static_cast<jint>(level), jcomponent, jmessage);
+    env->DeleteLocalRef(jcomponent);
+    env->DeleteLocalRef(jmessage);
+    if (attached) ctx->jvm->DetachCurrentThread();
+}
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*) {
     return JNI_VERSION_1_6;
 }
 
-JNIEXPORT void JNICALL
-Java_com_cactus_CactusJNI_nativeSetFramework(JNIEnv*, jobject) {
-    cactus_set_telemetry_environment("kotlin", nullptr, nullptr);
-}
-
-JNIEXPORT void JNICALL
-Java_com_cactus_CactusJNI_nativeSetCacheDir(JNIEnv* env, jobject, jstring cacheDir) {
-    const char* dir = jstring_to_cstr(env, cacheDir);
-    cactus_set_telemetry_environment(nullptr, dir, nullptr);
-    release_jstring(env, cacheDir, dir);
-}
-
 JNIEXPORT jlong JNICALL
 Java_com_cactus_CactusJNI_nativeInit(JNIEnv* env, jobject, jstring modelPath, jstring corpusDir, jboolean cacheIndex) {
-    const char* path = jstring_to_cstr(env, modelPath);
-    const char* corpus = jstring_to_cstr(env, corpusDir);
+    const char* path = env->GetStringUTFChars(modelPath, nullptr);
+    const char* corpus = corpusDir ? env->GetStringUTFChars(corpusDir, nullptr) : nullptr;
     jlong handle = reinterpret_cast<jlong>(cactus_init(path, corpus, cacheIndex == JNI_TRUE));
-    release_jstring(env, modelPath, path);
-    release_jstring(env, corpusDir, corpus);
+    env->ReleaseStringUTFChars(modelPath, path);
+    if (corpus) env->ReleaseStringUTFChars(corpusDir, corpus);
     return handle;
 }
 
 JNIEXPORT void JNICALL
 Java_com_cactus_CactusJNI_nativeDestroy(JNIEnv*, jobject, jlong handle) {
-    if (handle != 0) {
-        cactus_destroy(reinterpret_cast<cactus_model_t>(handle));
-    }
+    cactus_destroy(reinterpret_cast<cactus_model_t>(handle));
 }
 
 JNIEXPORT void JNICALL
 Java_com_cactus_CactusJNI_nativeReset(JNIEnv*, jobject, jlong handle) {
-    if (handle != 0) {
-        cactus_reset(reinterpret_cast<cactus_model_t>(handle));
-    }
+    cactus_reset(reinterpret_cast<cactus_model_t>(handle));
 }
 
 JNIEXPORT void JNICALL
 Java_com_cactus_CactusJNI_nativeStop(JNIEnv*, jobject, jlong handle) {
-    if (handle != 0) {
-        cactus_stop(reinterpret_cast<cactus_model_t>(handle));
-    }
+    cactus_stop(reinterpret_cast<cactus_model_t>(handle));
 }
 
-JNIEXPORT jstring JNICALL
+JNIEXPORT jint JNICALL
 Java_com_cactus_CactusJNI_nativeComplete(JNIEnv* env, jobject, jlong handle,
-                                          jstring messagesJson, jstring optionsJson,
-                                          jstring toolsJson, jobject callback,
-                                          jbyteArray pcmData) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
+                                          jstring messagesJson, jbyteArray responseBuffer,
+                                          jstring optionsJson, jstring toolsJson,
+                                          jobject callback, jbyteArray pcmData) {
+    const char* messages = env->GetStringUTFChars(messagesJson, nullptr);
+    const char* options = optionsJson ? env->GetStringUTFChars(optionsJson, nullptr) : nullptr;
+    const char* tools = toolsJson ? env->GetStringUTFChars(toolsJson, nullptr) : nullptr;
 
-    const char* messages = jstring_to_cstr(env, messagesJson);
-    const char* options = jstring_to_cstr(env, optionsJson);
-    const char* tools = jstring_to_cstr(env, toolsJson);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
+    jsize bufSize = env->GetArrayLength(responseBuffer);
+    jbyte* buf = env->GetByteArrayElements(responseBuffer, nullptr);
 
     TokenCallbackContext* ctx = nullptr;
     cactus_token_callback cb = nullptr;
-
-    if (callback != nullptr) {
-        jclass callbackClass = env->GetObjectClass(callback);
-        jmethodID method = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;I)V");
-        if (method != nullptr) {
-            ctx = new TokenCallbackContext{env, callback, method};
-            cb = token_callback_bridge;
-        }
+    if (callback) {
+        JavaVM* jvm = nullptr;
+        env->GetJavaVM(&jvm);
+        jclass cls = env->GetObjectClass(callback);
+        jmethodID method = env->GetMethodID(cls, "onToken", "(Ljava/lang/String;I)V");
+        ctx = new TokenCallbackContext{jvm, env->NewGlobalRef(callback), method};
+        cb = token_callback_bridge;
     }
 
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
     jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
+    size_t pcmSize = 0;
+    if (pcmData) {
         pcmSize = env->GetArrayLength(pcmData);
         pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
     }
 
     int result = cactus_complete(
         reinterpret_cast<cactus_model_t>(handle),
-        messages,
-        buffer.data(),
-        buffer.size(),
-        options,
-        tools,
-        cb,
-        ctx,
-        pcmBuffer,
-        pcmSize
+        messages, reinterpret_cast<char*>(buf), static_cast<size_t>(bufSize),
+        options, tools, cb, ctx,
+        reinterpret_cast<const uint8_t*>(pcmBytes), pcmSize
     );
 
-    delete ctx;
+    if (ctx) { env->DeleteGlobalRef(ctx->callback); delete ctx; }
+    env->ReleaseByteArrayElements(responseBuffer, buf, 0);
+    if (pcmBytes) env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
+    env->ReleaseStringUTFChars(messagesJson, messages);
+    if (options) env->ReleaseStringUTFChars(optionsJson, options);
+    if (tools) env->ReleaseStringUTFChars(toolsJson, tools);
 
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
-
-    release_jstring(env, messagesJson, messages);
-    release_jstring(env, optionsJson, options);
-    release_jstring(env, toolsJson, tools);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
+    return result;
 }
 
-JNIEXPORT jstring JNICALL
+JNIEXPORT jint JNICALL
 Java_com_cactus_CactusJNI_nativePrefill(JNIEnv* env, jobject, jlong handle,
-                                         jstring messagesJson, jstring optionsJson,
-                                         jstring toolsJson, jbyteArray pcmData) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
+                                         jstring messagesJson, jbyteArray responseBuffer,
+                                         jstring optionsJson, jstring toolsJson,
+                                         jbyteArray pcmData) {
+    const char* messages = env->GetStringUTFChars(messagesJson, nullptr);
+    const char* options = optionsJson ? env->GetStringUTFChars(optionsJson, nullptr) : nullptr;
+    const char* tools = toolsJson ? env->GetStringUTFChars(toolsJson, nullptr) : nullptr;
 
-    const char* messages = jstring_to_cstr(env, messagesJson);
-    const char* options = jstring_to_cstr(env, optionsJson);
-    const char* tools = jstring_to_cstr(env, toolsJson);
+    jsize bufSize = env->GetArrayLength(responseBuffer);
+    jbyte* buf = env->GetByteArrayElements(responseBuffer, nullptr);
 
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
     jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
+    size_t pcmSize = 0;
+    if (pcmData) {
         pcmSize = env->GetArrayLength(pcmData);
         pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
     }
 
     int result = cactus_prefill(
         reinterpret_cast<cactus_model_t>(handle),
-        messages,
-        buffer.data(),
-        buffer.size(),
-        options,
-        tools,
-        pcmBuffer,
-        pcmSize
+        messages, reinterpret_cast<char*>(buf), static_cast<size_t>(bufSize),
+        options, tools,
+        reinterpret_cast<const uint8_t*>(pcmBytes), pcmSize
     );
 
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
+    env->ReleaseByteArrayElements(responseBuffer, buf, 0);
+    if (pcmBytes) env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
+    env->ReleaseStringUTFChars(messagesJson, messages);
+    if (options) env->ReleaseStringUTFChars(optionsJson, options);
+    if (tools) env->ReleaseStringUTFChars(toolsJson, tools);
 
-    release_jstring(env, messagesJson, messages);
-    release_jstring(env, optionsJson, options);
-    release_jstring(env, toolsJson, tools);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
+    return result;
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeTranscribe(JNIEnv* env, jobject, jlong handle,
-                                            jstring audioPath, jstring prompt,
-                                            jstring optionsJson, jobject callback,
-                                            jbyteArray pcmData) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* path = jstring_to_cstr(env, audioPath);
-    const char* promptStr = jstring_to_cstr(env, prompt);
-    const char* options = jstring_to_cstr(env, optionsJson);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    TokenCallbackContext* ctx = nullptr;
-    cactus_token_callback cb = nullptr;
-
-    if (callback != nullptr) {
-        jclass callbackClass = env->GetObjectClass(callback);
-        jmethodID method = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;I)V");
-        if (method != nullptr) {
-            ctx = new TokenCallbackContext{env, callback, method};
-            cb = token_callback_bridge;
-        }
-    }
-
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
-    jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
-        pcmSize = env->GetArrayLength(pcmData);
-        pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
-    }
-
-    int result = cactus_transcribe(
-        reinterpret_cast<cactus_model_t>(handle),
-        path,
-        promptStr,
-        buffer.data(),
-        buffer.size(),
-        options,
-        cb,
-        ctx,
-        pcmBuffer,
-        pcmSize
-    );
-
-    delete ctx;
-
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
-
-    release_jstring(env, audioPath, path);
-    release_jstring(env, prompt, promptStr);
-    release_jstring(env, optionsJson, options);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
-
-JNIEXPORT jfloatArray JNICALL
-Java_com_cactus_CactusJNI_nativeEmbed(JNIEnv* env, jobject, jlong handle,
-                                       jstring text, jboolean normalize) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* textStr = jstring_to_cstr(env, text);
-
-    std::vector<float> buffer(4096);
-    size_t embeddingDim = 0;
-
-    int result = cactus_embed(
-        reinterpret_cast<cactus_model_t>(handle),
-        textStr,
-        buffer.data(),
-        buffer.size(),
-        &embeddingDim,
-        normalize == JNI_TRUE
-    );
-
-    release_jstring(env, text, textStr);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-
-    jfloatArray jarray = env->NewFloatArray(static_cast<jsize>(embeddingDim));
-    if (embeddingDim > 0) {
-        env->SetFloatArrayRegion(jarray, 0, static_cast<jsize>(embeddingDim), buffer.data());
-    }
-    return jarray;
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeRagQuery(JNIEnv* env, jobject, jlong handle,
-                                          jstring query, jint topK) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* queryStr = jstring_to_cstr(env, query);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    int result = cactus_rag_query(
-        reinterpret_cast<cactus_model_t>(handle),
-        queryStr,
-        buffer.data(),
-        buffer.size(),
-        static_cast<size_t>(topK)
-    );
-
-    release_jstring(env, query, queryStr);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeGetLastError(JNIEnv* env, jobject) {
-    const char* error = cactus_get_last_error();
-    return env->NewStringUTF(error ? error : "");
-}
-
-JNIEXPORT void JNICALL
-Java_com_cactus_CactusJNI_nativeSetAppId(JNIEnv* env, jobject, jstring appId) {
-    const char* id = jstring_to_cstr(env, appId);
-    cactus_set_app_id(id);
-    release_jstring(env, appId, id);
-}
-
-JNIEXPORT void JNICALL
-Java_com_cactus_CactusJNI_nativeTelemetryFlush(JNIEnv*, jobject) {
-    cactus_telemetry_flush();
-}
-
-JNIEXPORT void JNICALL
-Java_com_cactus_CactusJNI_nativeTelemetryShutdown(JNIEnv*, jobject) {
-    cactus_telemetry_shutdown();
-}
-
-JNIEXPORT jintArray JNICALL
-Java_com_cactus_CactusJNI_nativeTokenize(JNIEnv* env, jobject, jlong handle, jstring text) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* textStr = jstring_to_cstr(env, text);
-    std::vector<uint32_t> buffer(8192);
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeTokenize(JNIEnv* env, jobject, jlong handle,
+                                          jstring text, jintArray tokenBuffer, jlongArray outTokenLen) {
+    const char* textStr = env->GetStringUTFChars(text, nullptr);
+    jsize bufLen = env->GetArrayLength(tokenBuffer);
+    jint* tokens = env->GetIntArrayElements(tokenBuffer, nullptr);
     size_t tokenLen = 0;
 
     int result = cactus_tokenize(
         reinterpret_cast<cactus_model_t>(handle),
         textStr,
-        buffer.data(),
-        buffer.size(),
+        reinterpret_cast<uint32_t*>(tokens),
+        static_cast<size_t>(bufLen),
         &tokenLen
     );
 
-    release_jstring(env, text, textStr);
+    env->ReleaseIntArrayElements(tokenBuffer, tokens, 0);
+    env->ReleaseStringUTFChars(text, textStr);
 
-    if (result < 0) { throwOnError(env); return nullptr; }
+    jlong len = static_cast<jlong>(tokenLen);
+    env->SetLongArrayRegion(outTokenLen, 0, 1, &len);
 
-    jintArray jarray = env->NewIntArray(static_cast<jsize>(tokenLen));
-    if (tokenLen > 0) {
-        env->SetIntArrayRegion(jarray, 0, static_cast<jsize>(tokenLen), reinterpret_cast<jint*>(buffer.data()));
-    }
-    return jarray;
+    return result;
 }
 
-JNIEXPORT jstring JNICALL
+JNIEXPORT jint JNICALL
 Java_com_cactus_CactusJNI_nativeScoreWindow(JNIEnv* env, jobject, jlong handle,
-                                             jintArray tokens, jint start, jint end, jint context) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
+                                             jintArray tokens, jlong start, jlong end,
+                                             jlong context, jbyteArray responseBuffer) {
     jsize tokenLen = env->GetArrayLength(tokens);
     jint* tokenData = env->GetIntArrayElements(tokens, nullptr);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
+    jsize bufSize = env->GetArrayLength(responseBuffer);
+    jbyte* buf = env->GetByteArrayElements(responseBuffer, nullptr);
 
     int result = cactus_score_window(
         reinterpret_cast<cactus_model_t>(handle),
@@ -379,272 +201,159 @@ Java_com_cactus_CactusJNI_nativeScoreWindow(JNIEnv* env, jobject, jlong handle,
         static_cast<size_t>(start),
         static_cast<size_t>(end),
         static_cast<size_t>(context),
-        buffer.data(),
-        buffer.size()
+        reinterpret_cast<char*>(buf),
+        static_cast<size_t>(bufSize)
     );
 
     env->ReleaseIntArrayElements(tokens, tokenData, JNI_ABORT);
+    env->ReleaseByteArrayElements(responseBuffer, buf, 0);
 
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
-
-JNIEXPORT jlong JNICALL
-Java_com_cactus_CactusJNI_nativeStreamTranscribeInit(JNIEnv* env, jobject, jlong handle, jstring optionsJson) {
-    if (handle == 0) return 0;
-    const char* options = jstring_to_cstr(env, optionsJson);
-    jlong result = reinterpret_cast<jlong>(cactus_stream_transcribe_start(reinterpret_cast<cactus_model_t>(handle), options));
-    release_jstring(env, optionsJson, options);
     return result;
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeStreamTranscribeProcess(JNIEnv* env, jobject, jlong streamHandle, jbyteArray pcmData) {
-    if (streamHandle == 0) { throwCactusException(env, "Stream not initialized"); return nullptr; }
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeTranscribe(JNIEnv* env, jobject, jlong handle,
+                                            jstring audioPath, jstring prompt,
+                                            jbyteArray responseBuffer,
+                                            jstring optionsJson, jobject callback,
+                                            jbyteArray pcmData) {
+    const char* path = audioPath ? env->GetStringUTFChars(audioPath, nullptr) : nullptr;
+    const char* promptStr = env->GetStringUTFChars(prompt, nullptr);
+    const char* options = optionsJson ? env->GetStringUTFChars(optionsJson, nullptr) : nullptr;
 
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-    int result;
+    jsize bufSize = env->GetArrayLength(responseBuffer);
+    jbyte* buf = env->GetByteArrayElements(responseBuffer, nullptr);
 
-    if (pcmData != nullptr) {
-        jsize pcmSize = env->GetArrayLength(pcmData);
-        jbyte* pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-
-        result = cactus_stream_transcribe_process(
-            reinterpret_cast<cactus_stream_transcribe_t>(streamHandle),
-            reinterpret_cast<const uint8_t*>(pcmBytes),
-            static_cast<size_t>(pcmSize),
-            buffer.data(),
-            buffer.size()
-        );
-
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    } else {
-        result = cactus_stream_transcribe_process(
-            reinterpret_cast<cactus_stream_transcribe_t>(streamHandle),
-            nullptr,
-            0,
-            buffer.data(),
-            buffer.size()
-        );
+    TokenCallbackContext* ctx = nullptr;
+    cactus_token_callback cb = nullptr;
+    if (callback) {
+        JavaVM* jvm = nullptr;
+        env->GetJavaVM(&jvm);
+        jclass cls = env->GetObjectClass(callback);
+        jmethodID method = env->GetMethodID(cls, "onToken", "(Ljava/lang/String;I)V");
+        ctx = new TokenCallbackContext{jvm, env->NewGlobalRef(callback), method};
+        cb = token_callback_bridge;
     }
 
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
+    jbyte* pcmBytes = nullptr;
+    size_t pcmSize = 0;
+    if (pcmData) {
+        pcmSize = env->GetArrayLength(pcmData);
+        pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
+    }
 
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeStreamTranscribeStop(JNIEnv* env, jobject, jlong streamHandle) {
-    if (streamHandle == 0) { throwCactusException(env, "Stream not initialized"); return nullptr; }
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    int result = cactus_stream_transcribe_stop(
-        reinterpret_cast<cactus_stream_transcribe_t>(streamHandle),
-        buffer.data(),
-        buffer.size()
+    int result = cactus_transcribe(
+        reinterpret_cast<cactus_model_t>(handle),
+        path, promptStr,
+        reinterpret_cast<char*>(buf), static_cast<size_t>(bufSize),
+        options, cb, ctx,
+        reinterpret_cast<const uint8_t*>(pcmBytes), pcmSize
     );
 
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
+    if (ctx) { env->DeleteGlobalRef(ctx->callback); delete ctx; }
+    env->ReleaseByteArrayElements(responseBuffer, buf, 0);
+    if (pcmBytes) env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
+    if (path) env->ReleaseStringUTFChars(audioPath, path);
+    env->ReleaseStringUTFChars(prompt, promptStr);
+    if (options) env->ReleaseStringUTFChars(optionsJson, options);
+
+    return result;
 }
 
-JNIEXPORT jfloatArray JNICALL
-Java_com_cactus_CactusJNI_nativeImageEmbed(JNIEnv* env, jobject, jlong handle, jstring imagePath) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeEmbed(JNIEnv* env, jobject, jlong handle,
+                                       jstring text, jfloatArray embeddingsBuffer,
+                                       jlongArray outEmbeddingDim, jboolean normalize) {
+    const char* textStr = env->GetStringUTFChars(text, nullptr);
+    jsize bufSize = env->GetArrayLength(embeddingsBuffer);
+    jfloat* buf = env->GetFloatArrayElements(embeddingsBuffer, nullptr);
+    size_t embeddingDim = 0;
 
-    const char* path = jstring_to_cstr(env, imagePath);
-    std::vector<float> buffer(4096);
+    int result = cactus_embed(
+        reinterpret_cast<cactus_model_t>(handle),
+        textStr, buf, static_cast<size_t>(bufSize),
+        &embeddingDim, normalize == JNI_TRUE
+    );
+
+    env->ReleaseFloatArrayElements(embeddingsBuffer, buf, 0);
+    env->ReleaseStringUTFChars(text, textStr);
+
+    jlong dim = static_cast<jlong>(embeddingDim);
+    env->SetLongArrayRegion(outEmbeddingDim, 0, 1, &dim);
+
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeImageEmbed(JNIEnv* env, jobject, jlong handle,
+                                            jstring imagePath, jfloatArray embeddingsBuffer,
+                                            jlongArray outEmbeddingDim) {
+    const char* path = env->GetStringUTFChars(imagePath, nullptr);
+    jsize bufSize = env->GetArrayLength(embeddingsBuffer);
+    jfloat* buf = env->GetFloatArrayElements(embeddingsBuffer, nullptr);
     size_t embeddingDim = 0;
 
     int result = cactus_image_embed(
         reinterpret_cast<cactus_model_t>(handle),
-        path,
-        buffer.data(),
-        buffer.size(),
-        &embeddingDim
+        path, buf, static_cast<size_t>(bufSize), &embeddingDim
     );
 
-    release_jstring(env, imagePath, path);
+    env->ReleaseFloatArrayElements(embeddingsBuffer, buf, 0);
+    env->ReleaseStringUTFChars(imagePath, path);
 
-    if (result < 0) { throwOnError(env); return nullptr; }
+    jlong dim = static_cast<jlong>(embeddingDim);
+    env->SetLongArrayRegion(outEmbeddingDim, 0, 1, &dim);
 
-    jfloatArray jarray = env->NewFloatArray(static_cast<jsize>(embeddingDim));
-    if (embeddingDim > 0) {
-        env->SetFloatArrayRegion(jarray, 0, static_cast<jsize>(embeddingDim), buffer.data());
-    }
-    return jarray;
+    return result;
 }
 
-JNIEXPORT jfloatArray JNICALL
-Java_com_cactus_CactusJNI_nativeAudioEmbed(JNIEnv* env, jobject, jlong handle, jstring audioPath) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* path = jstring_to_cstr(env, audioPath);
-    std::vector<float> buffer(4096);
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeAudioEmbed(JNIEnv* env, jobject, jlong handle,
+                                            jstring audioPath, jfloatArray embeddingsBuffer,
+                                            jlongArray outEmbeddingDim) {
+    const char* path = env->GetStringUTFChars(audioPath, nullptr);
+    jsize bufSize = env->GetArrayLength(embeddingsBuffer);
+    jfloat* buf = env->GetFloatArrayElements(embeddingsBuffer, nullptr);
     size_t embeddingDim = 0;
 
     int result = cactus_audio_embed(
         reinterpret_cast<cactus_model_t>(handle),
-        path,
-        buffer.data(),
-        buffer.size(),
-        &embeddingDim
+        path, buf, static_cast<size_t>(bufSize), &embeddingDim
     );
 
-    release_jstring(env, audioPath, path);
+    env->ReleaseFloatArrayElements(embeddingsBuffer, buf, 0);
+    env->ReleaseStringUTFChars(audioPath, path);
 
-    if (result < 0) { throwOnError(env); return nullptr; }
+    jlong dim = static_cast<jlong>(embeddingDim);
+    env->SetLongArrayRegion(outEmbeddingDim, 0, 1, &dim);
 
-    jfloatArray jarray = env->NewFloatArray(static_cast<jsize>(embeddingDim));
-    if (embeddingDim > 0) {
-        env->SetFloatArrayRegion(jarray, 0, static_cast<jsize>(embeddingDim), buffer.data());
-    }
-    return jarray;
+    return result;
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeVad(JNIEnv* env, jobject, jlong handle,
-                                     jstring audioPath, jstring optionsJson, jbyteArray pcmData) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeRagQuery(JNIEnv* env, jobject, jlong handle,
+                                          jstring query, jbyteArray responseBuffer, jlong topK) {
+    const char* queryStr = env->GetStringUTFChars(query, nullptr);
+    jsize bufSize = env->GetArrayLength(responseBuffer);
+    jbyte* buf = env->GetByteArrayElements(responseBuffer, nullptr);
 
-    const char* path = jstring_to_cstr(env, audioPath);
-    const char* options = jstring_to_cstr(env, optionsJson);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
-    jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
-        pcmSize = env->GetArrayLength(pcmData);
-        pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
-    }
-
-    int result = cactus_vad(
+    int result = cactus_rag_query(
         reinterpret_cast<cactus_model_t>(handle),
-        path,
-        buffer.data(),
-        buffer.size(),
-        options,
-        pcmBuffer,
-        pcmSize
+        queryStr, reinterpret_cast<char*>(buf), static_cast<size_t>(bufSize),
+        static_cast<size_t>(topK)
     );
 
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
+    env->ReleaseByteArrayElements(responseBuffer, buf, 0);
+    env->ReleaseStringUTFChars(query, queryStr);
 
-    release_jstring(env, audioPath, path);
-    release_jstring(env, optionsJson, options);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeDiarize(JNIEnv* env, jobject, jlong handle,
-                                          jstring audioPath, jstring optionsJson, jbyteArray pcmData) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* path = jstring_to_cstr(env, audioPath);
-    const char* opts = jstring_to_cstr(env, optionsJson);
-
-    std::vector<char> buffer(1 << 20);
-
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
-    jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
-        pcmSize = env->GetArrayLength(pcmData);
-        pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
-    }
-
-    int result = cactus_diarize(
-        reinterpret_cast<cactus_model_t>(handle),
-        path,
-        buffer.data(),
-        buffer.size(),
-        opts,
-        pcmBuffer,
-        pcmSize
-    );
-
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
-
-    release_jstring(env, audioPath, path);
-    release_jstring(env, optionsJson, opts);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeEmbedSpeaker(JNIEnv* env, jobject, jlong handle,
-                                               jstring audioPath, jstring optionsJson, jbyteArray pcmData, jfloatArray maskWeights) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* path = jstring_to_cstr(env, audioPath);
-    const char* opts = jstring_to_cstr(env, optionsJson);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
-    jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
-        pcmSize = env->GetArrayLength(pcmData);
-        pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
-    }
-
-    const float* maskPtr = nullptr;
-    size_t maskSize = 0;
-    jfloat* maskFloats = nullptr;
-
-    if (maskWeights != nullptr) {
-        maskSize = env->GetArrayLength(maskWeights);
-        maskFloats = env->GetFloatArrayElements(maskWeights, nullptr);
-        maskPtr = maskFloats;
-    }
-
-    int result = cactus_embed_speaker(
-        reinterpret_cast<cactus_model_t>(handle),
-        path,
-        buffer.data(),
-        buffer.size(),
-        opts,
-        pcmBuffer,
-        pcmSize,
-        maskPtr,
-        maskSize
-    );
-
-    if (maskFloats != nullptr) {
-        env->ReleaseFloatArrayElements(maskWeights, maskFloats, JNI_ABORT);
-    }
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
-
-    release_jstring(env, audioPath, path);
-    release_jstring(env, optionsJson, opts);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
+    return result;
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_cactus_CactusJNI_nativeIndexInit(JNIEnv* env, jobject, jstring indexDir, jint embeddingDim) {
-    const char* dir = jstring_to_cstr(env, indexDir);
+Java_com_cactus_CactusJNI_nativeIndexInit(JNIEnv* env, jobject, jstring indexDir, jlong embeddingDim) {
+    const char* dir = env->GetStringUTFChars(indexDir, nullptr);
     jlong handle = reinterpret_cast<jlong>(cactus_index_init(dir, static_cast<size_t>(embeddingDim)));
-    release_jstring(env, indexDir, dir);
+    env->ReleaseStringUTFChars(indexDir, dir);
     return handle;
 }
 
@@ -653,26 +362,25 @@ Java_com_cactus_CactusJNI_nativeIndexAdd(JNIEnv* env, jobject, jlong handle,
                                           jintArray ids, jobjectArray documents,
                                           jobjectArray metadatas, jobjectArray embeddings,
                                           jlong embeddingDim) {
-    if (handle == 0) return -1;
-
     jsize count = env->GetArrayLength(ids);
     jint* idData = env->GetIntArrayElements(ids, nullptr);
 
-    std::vector<const char*> docPtrs(count);
-    std::vector<const char*> metaPtrs(count);
-    std::vector<const float*> embPtrs(count);
-    std::vector<jstring> docStrings(count);
-    std::vector<jstring> metaStrings(count);
-    std::vector<jfloatArray> embArrays(count);
+    const char** docPtrs = new const char*[count];
+    const char** metaPtrs = new const char*[count];
+    const float** embPtrs = new const float*[count];
+    jstring* docStrings = new jstring[count];
+    jstring* metaStrings = new jstring[count];
+    jfloatArray* embArrays = new jfloatArray[count];
 
     for (jsize i = 0; i < count; i++) {
         docStrings[i] = static_cast<jstring>(env->GetObjectArrayElement(documents, i));
-        docPtrs[i] = jstring_to_cstr(env, docStrings[i]);
+        docPtrs[i] = env->GetStringUTFChars(docStrings[i], nullptr);
 
-        if (metadatas != nullptr) {
+        if (metadatas) {
             metaStrings[i] = static_cast<jstring>(env->GetObjectArrayElement(metadatas, i));
-            metaPtrs[i] = jstring_to_cstr(env, metaStrings[i]);
+            metaPtrs[i] = env->GetStringUTFChars(metaStrings[i], nullptr);
         } else {
+            metaStrings[i] = nullptr;
             metaPtrs[i] = nullptr;
         }
 
@@ -683,30 +391,31 @@ Java_com_cactus_CactusJNI_nativeIndexAdd(JNIEnv* env, jobject, jlong handle,
     int result = cactus_index_add(
         reinterpret_cast<cactus_index_t>(handle),
         reinterpret_cast<const int*>(idData),
-        docPtrs.data(),
-        metadatas != nullptr ? metaPtrs.data() : nullptr,
-        embPtrs.data(),
-        static_cast<size_t>(count),
-        static_cast<size_t>(embeddingDim)
+        docPtrs, metadatas ? metaPtrs : nullptr, embPtrs,
+        static_cast<size_t>(count), static_cast<size_t>(embeddingDim)
     );
 
     for (jsize i = 0; i < count; i++) {
-        release_jstring(env, docStrings[i], docPtrs[i]);
-        if (metadatas != nullptr) {
-            release_jstring(env, metaStrings[i], metaPtrs[i]);
-        }
+        env->ReleaseStringUTFChars(docStrings[i], docPtrs[i]);
+        env->DeleteLocalRef(docStrings[i]);
+        if (metaStrings[i]) { env->ReleaseStringUTFChars(metaStrings[i], metaPtrs[i]); env->DeleteLocalRef(metaStrings[i]); }
         env->ReleaseFloatArrayElements(embArrays[i], const_cast<jfloat*>(embPtrs[i]), JNI_ABORT);
+        env->DeleteLocalRef(embArrays[i]);
     }
 
     env->ReleaseIntArrayElements(ids, idData, JNI_ABORT);
-    if (result < 0) { throwOnError(env); return -1; }
+    delete[] docPtrs;
+    delete[] metaPtrs;
+    delete[] embPtrs;
+    delete[] docStrings;
+    delete[] metaStrings;
+    delete[] embArrays;
+
     return result;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_cactus_CactusJNI_nativeIndexDelete(JNIEnv* env, jobject, jlong handle, jintArray ids) {
-    if (handle == 0) { throwCactusException(env, "Index not initialized"); return -1; }
-
     jsize count = env->GetArrayLength(ids);
     jint* idData = env->GetIntArrayElements(ids, nullptr);
 
@@ -717,138 +426,168 @@ Java_com_cactus_CactusJNI_nativeIndexDelete(JNIEnv* env, jobject, jlong handle, 
     );
 
     env->ReleaseIntArrayElements(ids, idData, JNI_ABORT);
-    if (result < 0) { throwOnError(env); return -1; }
     return result;
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeIndexQuery(JNIEnv* env, jobject, jlong handle,
-                                            jfloatArray embedding, jlong topK, jstring optionsJson) {
-    if (handle == 0) { throwCactusException(env, "Index not initialized"); return nullptr; }
-
-    jsize embDim = env->GetArrayLength(embedding);
-    jfloat* embData = env->GetFloatArrayElements(embedding, nullptr);
-    const char* options = jstring_to_cstr(env, optionsJson);
-
-    std::vector<int> idBuffer(static_cast<size_t>(topK));
-    std::vector<float> scoreBuffer(static_cast<size_t>(topK));
-    size_t idBufferSize = static_cast<size_t>(topK);
-    size_t scoreBufferSize = static_cast<size_t>(topK);
-
-    const float* embPtr = embData;
-    int* idPtr = idBuffer.data();
-    float* scorePtr = scoreBuffer.data();
-
-    int result = cactus_index_query(
-        reinterpret_cast<cactus_index_t>(handle),
-        &embPtr,
-        1,
-        static_cast<size_t>(embDim),
-        options,
-        &idPtr,
-        &idBufferSize,
-        &scorePtr,
-        &scoreBufferSize
-    );
-
-    env->ReleaseFloatArrayElements(embedding, embData, JNI_ABORT);
-    release_jstring(env, optionsJson, options);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-
-    std::string json = "{\"results\":[";
-    for (size_t i = 0; i < idBufferSize; i++) {
-        if (i > 0) json += ",";
-        json += "{\"id\":" + std::to_string(idBuffer[i]) + ",\"score\":" + std::to_string(scoreBuffer[i]) + "}";
-    }
-    json += "]}";
-
-    return env->NewStringUTF(json.c_str());
 }
 
 JNIEXPORT jint JNICALL
-Java_com_cactus_CactusJNI_nativeIndexCompact(JNIEnv* env, jobject, jlong handle) {
-    if (handle == 0) { throwCactusException(env, "Index not initialized"); return -1; }
-    int result = cactus_index_compact(reinterpret_cast<cactus_index_t>(handle));
-    if (result < 0) { throwOnError(env); return -1; }
+Java_com_cactus_CactusJNI_nativeIndexGet(JNIEnv* env, jobject, jlong handle,
+                                          jintArray ids,
+                                          jobjectArray documentBuffers, jlongArray documentBufferSizes,
+                                          jobjectArray metadataBuffers, jlongArray metadataBufferSizes,
+                                          jobjectArray embeddingBuffers, jlongArray embeddingBufferSizes) {
+    jsize count = env->GetArrayLength(ids);
+    jint* idData = env->GetIntArrayElements(ids, nullptr);
+
+    char** docBufs = new char*[count];
+    size_t* docSizes = new size_t[count];
+    char** metaBufs = new char*[count];
+    size_t* metaSizes = new size_t[count];
+    float** embBufs = new float*[count];
+    size_t* embSizes = new size_t[count];
+
+    jbyteArray* docArrays = new jbyteArray[count];
+    jbyteArray* metaArrays = new jbyteArray[count];
+    jfloatArray* embArrays = new jfloatArray[count];
+
+    jlong* docSizesIn = env->GetLongArrayElements(documentBufferSizes, nullptr);
+    jlong* metaSizesIn = env->GetLongArrayElements(metadataBufferSizes, nullptr);
+    jlong* embSizesIn = env->GetLongArrayElements(embeddingBufferSizes, nullptr);
+
+    for (jsize i = 0; i < count; i++) {
+        docArrays[i] = static_cast<jbyteArray>(env->GetObjectArrayElement(documentBuffers, i));
+        docBufs[i] = reinterpret_cast<char*>(env->GetByteArrayElements(docArrays[i], nullptr));
+        docSizes[i] = static_cast<size_t>(docSizesIn[i]);
+
+        metaArrays[i] = static_cast<jbyteArray>(env->GetObjectArrayElement(metadataBuffers, i));
+        metaBufs[i] = reinterpret_cast<char*>(env->GetByteArrayElements(metaArrays[i], nullptr));
+        metaSizes[i] = static_cast<size_t>(metaSizesIn[i]);
+
+        embArrays[i] = static_cast<jfloatArray>(env->GetObjectArrayElement(embeddingBuffers, i));
+        embBufs[i] = env->GetFloatArrayElements(embArrays[i], nullptr);
+        embSizes[i] = static_cast<size_t>(embSizesIn[i]);
+    }
+
+    int result = cactus_index_get(
+        reinterpret_cast<cactus_index_t>(handle),
+        reinterpret_cast<const int*>(idData),
+        static_cast<size_t>(count),
+        docBufs, docSizes, metaBufs, metaSizes, embBufs, embSizes
+    );
+
+    for (jsize i = 0; i < count; i++) {
+        env->ReleaseByteArrayElements(docArrays[i], reinterpret_cast<jbyte*>(docBufs[i]), 0);
+        env->DeleteLocalRef(docArrays[i]);
+        env->ReleaseByteArrayElements(metaArrays[i], reinterpret_cast<jbyte*>(metaBufs[i]), 0);
+        env->DeleteLocalRef(metaArrays[i]);
+        env->ReleaseFloatArrayElements(embArrays[i], embBufs[i], 0);
+        env->DeleteLocalRef(embArrays[i]);
+        docSizesIn[i] = static_cast<jlong>(docSizes[i]);
+        metaSizesIn[i] = static_cast<jlong>(metaSizes[i]);
+        embSizesIn[i] = static_cast<jlong>(embSizes[i]);
+    }
+
+    env->ReleaseLongArrayElements(documentBufferSizes, docSizesIn, 0);
+    env->ReleaseLongArrayElements(metadataBufferSizes, metaSizesIn, 0);
+    env->ReleaseLongArrayElements(embeddingBufferSizes, embSizesIn, 0);
+    env->ReleaseIntArrayElements(ids, idData, JNI_ABORT);
+
+    delete[] docBufs;
+    delete[] docSizes;
+    delete[] metaBufs;
+    delete[] metaSizes;
+    delete[] embBufs;
+    delete[] embSizes;
+    delete[] docArrays;
+    delete[] metaArrays;
+    delete[] embArrays;
+
     return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeIndexQuery(JNIEnv* env, jobject, jlong handle,
+                                            jobjectArray embeddings, jlong embeddingDim,
+                                            jstring optionsJson,
+                                            jobjectArray idBuffers, jlongArray idBufferSizes,
+                                            jobjectArray scoreBuffers, jlongArray scoreBufferSizes) {
+    jsize embCount = env->GetArrayLength(embeddings);
+    const char* options = optionsJson ? env->GetStringUTFChars(optionsJson, nullptr) : nullptr;
+
+    const float** embPtrs = new const float*[embCount];
+    jfloatArray* embArrays = new jfloatArray[embCount];
+
+    for (jsize i = 0; i < embCount; i++) {
+        embArrays[i] = static_cast<jfloatArray>(env->GetObjectArrayElement(embeddings, i));
+        embPtrs[i] = env->GetFloatArrayElements(embArrays[i], nullptr);
+    }
+
+    int** idPtrs = new int*[embCount];
+    size_t* idSizes = new size_t[embCount];
+    float** scorePtrs = new float*[embCount];
+    size_t* scoreSizes = new size_t[embCount];
+
+    jintArray* idJArrays = new jintArray[embCount];
+    jfloatArray* scoreJArrays = new jfloatArray[embCount];
+
+    jlong* idSizesIn = env->GetLongArrayElements(idBufferSizes, nullptr);
+    jlong* scoreSizesIn = env->GetLongArrayElements(scoreBufferSizes, nullptr);
+
+    for (jsize i = 0; i < embCount; i++) {
+        idJArrays[i] = static_cast<jintArray>(env->GetObjectArrayElement(idBuffers, i));
+        idPtrs[i] = env->GetIntArrayElements(idJArrays[i], nullptr);
+        idSizes[i] = static_cast<size_t>(idSizesIn[i]);
+
+        scoreJArrays[i] = static_cast<jfloatArray>(env->GetObjectArrayElement(scoreBuffers, i));
+        scorePtrs[i] = env->GetFloatArrayElements(scoreJArrays[i], nullptr);
+        scoreSizes[i] = static_cast<size_t>(scoreSizesIn[i]);
+    }
+
+    int result = cactus_index_query(
+        reinterpret_cast<cactus_index_t>(handle),
+        embPtrs, static_cast<size_t>(embCount), static_cast<size_t>(embeddingDim),
+        options, idPtrs, idSizes, scorePtrs, scoreSizes
+    );
+
+    for (jsize i = 0; i < embCount; i++) {
+        env->ReleaseFloatArrayElements(embArrays[i], const_cast<jfloat*>(embPtrs[i]), JNI_ABORT);
+        env->DeleteLocalRef(embArrays[i]);
+        env->ReleaseIntArrayElements(idJArrays[i], idPtrs[i], 0);
+        env->DeleteLocalRef(idJArrays[i]);
+        env->ReleaseFloatArrayElements(scoreJArrays[i], scorePtrs[i], 0);
+        env->DeleteLocalRef(scoreJArrays[i]);
+        idSizesIn[i] = static_cast<jlong>(idSizes[i]);
+        scoreSizesIn[i] = static_cast<jlong>(scoreSizes[i]);
+    }
+
+    env->ReleaseLongArrayElements(idBufferSizes, idSizesIn, 0);
+    env->ReleaseLongArrayElements(scoreBufferSizes, scoreSizesIn, 0);
+    if (options) env->ReleaseStringUTFChars(optionsJson, options);
+
+    delete[] embPtrs;
+    delete[] embArrays;
+    delete[] idPtrs;
+    delete[] idSizes;
+    delete[] scorePtrs;
+    delete[] scoreSizes;
+    delete[] idJArrays;
+    delete[] scoreJArrays;
+
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_cactus_CactusJNI_nativeIndexCompact(JNIEnv*, jobject, jlong handle) {
+    return cactus_index_compact(reinterpret_cast<cactus_index_t>(handle));
 }
 
 JNIEXPORT void JNICALL
 Java_com_cactus_CactusJNI_nativeIndexDestroy(JNIEnv*, jobject, jlong handle) {
-    if (handle != 0) {
-        cactus_index_destroy(reinterpret_cast<cactus_index_t>(handle));
-    }
+    cactus_index_destroy(reinterpret_cast<cactus_index_t>(handle));
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeDetectLanguage(JNIEnv* env, jobject, jlong handle,
-                                                jstring audioPath, jstring optionsJson,
-                                                jbyteArray pcmData) {
-    if (handle == 0) { throwCactusException(env, "Model not initialized"); return nullptr; }
-
-    const char* path = jstring_to_cstr(env, audioPath);
-    const char* options = jstring_to_cstr(env, optionsJson);
-
-    std::vector<char> buffer(DEFAULT_BUFFER_SIZE);
-
-    const uint8_t* pcmBuffer = nullptr;
-    size_t pcmSize = 0;
-    jbyte* pcmBytes = nullptr;
-
-    if (pcmData != nullptr) {
-        pcmSize = env->GetArrayLength(pcmData);
-        pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
-        pcmBuffer = reinterpret_cast<const uint8_t*>(pcmBytes);
-    }
-
-    int result = cactus_detect_language(
-        reinterpret_cast<cactus_model_t>(handle),
-        path,
-        buffer.data(),
-        buffer.size(),
-        options,
-        pcmBuffer,
-        pcmSize
-    );
-
-    if (pcmBytes != nullptr) {
-        env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
-    }
-
-    release_jstring(env, audioPath, path);
-    release_jstring(env, optionsJson, options);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-    return env->NewStringUTF(buffer.data());
-}
-
-struct LogCallbackContext {
-    JavaVM* jvm;
-    jobject callback;
-    jmethodID method;
-};
-
-static LogCallbackContext* g_log_callback_ctx = nullptr;
-
-static void log_callback_bridge(int level, const char* component, const char* message, void* user_data) {
-    if (!user_data) return;
-    auto* ctx = static_cast<LogCallbackContext*>(user_data);
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    jint status = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (status == JNI_EDETACHED) {
-        ctx->jvm->AttachCurrentThread(&env, nullptr);
-        attached = true;
-    }
-    if (env) {
-        jstring jcomponent = env->NewStringUTF(component ? component : "");
-        jstring jmessage = env->NewStringUTF(message ? message : "");
-        env->CallVoidMethod(ctx->callback, ctx->method, static_cast<jint>(level), jcomponent, jmessage);
-        env->DeleteLocalRef(jcomponent);
-        env->DeleteLocalRef(jmessage);
-    }
-    if (attached) ctx->jvm->DetachCurrentThread();
+Java_com_cactus_CactusJNI_nativeGetLastError(JNIEnv* env, jobject) {
+    return env->NewStringUTF(cactus_get_last_error());
 }
 
 JNIEXPORT void JNICALL
@@ -858,87 +597,50 @@ Java_com_cactus_CactusJNI_nativeLogSetLevel(JNIEnv*, jobject, jint level) {
 
 JNIEXPORT void JNICALL
 Java_com_cactus_CactusJNI_nativeLogSetCallback(JNIEnv* env, jobject, jobject callback) {
-    if (g_log_callback_ctx != nullptr) {
+    if (g_log_callback_ctx) {
         env->DeleteGlobalRef(g_log_callback_ctx->callback);
         delete g_log_callback_ctx;
         g_log_callback_ctx = nullptr;
     }
-    if (callback == nullptr) {
+    if (!callback) {
         cactus_log_set_callback(nullptr, nullptr);
         return;
     }
     JavaVM* jvm = nullptr;
     env->GetJavaVM(&jvm);
-    jclass callbackClass = env->GetObjectClass(callback);
-    jmethodID method = env->GetMethodID(callbackClass, "onLog", "(ILjava/lang/String;Ljava/lang/String;)V");
-    if (method == nullptr) return;
+    jclass cls = env->GetObjectClass(callback);
+    jmethodID method = env->GetMethodID(cls, "onLog", "(ILjava/lang/String;Ljava/lang/String;)V");
     g_log_callback_ctx = new LogCallbackContext{jvm, env->NewGlobalRef(callback), method};
     cactus_log_set_callback(log_callback_bridge, g_log_callback_ctx);
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_cactus_CactusJNI_nativeIndexGet(JNIEnv* env, jobject, jlong handle, jintArray ids) {
-    if (handle == 0) { throwCactusException(env, "Index not initialized"); return nullptr; }
+JNIEXPORT void JNICALL
+Java_com_cactus_CactusJNI_nativeSetTelemetryEnvironment(JNIEnv* env, jobject,
+                                                          jstring framework, jstring cacheLocation, jstring version) {
+    const char* fw = framework ? env->GetStringUTFChars(framework, nullptr) : nullptr;
+    const char* cache = cacheLocation ? env->GetStringUTFChars(cacheLocation, nullptr) : nullptr;
+    const char* ver = version ? env->GetStringUTFChars(version, nullptr) : nullptr;
+    cactus_set_telemetry_environment(fw, cache, ver);
+    if (fw) env->ReleaseStringUTFChars(framework, fw);
+    if (cache) env->ReleaseStringUTFChars(cacheLocation, cache);
+    if (ver) env->ReleaseStringUTFChars(version, ver);
+}
 
-    jsize count = env->GetArrayLength(ids);
-    jint* idData = env->GetIntArrayElements(ids, nullptr);
+JNIEXPORT void JNICALL
+Java_com_cactus_CactusJNI_nativeSetAppId(JNIEnv* env, jobject, jstring appId) {
+    const char* id = env->GetStringUTFChars(appId, nullptr);
+    cactus_set_app_id(id);
+    env->ReleaseStringUTFChars(appId, id);
+}
 
-    static constexpr size_t DOC_BUF_SIZE = 4096;
-    static constexpr size_t EMB_BUF_SIZE = 4096;
+JNIEXPORT void JNICALL
+Java_com_cactus_CactusJNI_nativeTelemetryFlush(JNIEnv*, jobject) {
+    cactus_telemetry_flush();
+}
 
-    std::vector<std::vector<char>> docRaw(count, std::vector<char>(DOC_BUF_SIZE, 0));
-    std::vector<std::vector<char>> metaRaw(count, std::vector<char>(DOC_BUF_SIZE, 0));
-    std::vector<std::vector<float>> embRaw(count, std::vector<float>(EMB_BUF_SIZE, 0.0f));
-
-    std::vector<char*> docBuffers(count);
-    std::vector<size_t> docBufferSizes(count, DOC_BUF_SIZE);
-    std::vector<char*> metaBuffers(count);
-    std::vector<size_t> metaBufferSizes(count, DOC_BUF_SIZE);
-    std::vector<float*> embBuffers(count);
-    std::vector<size_t> embBufferSizes(count, EMB_BUF_SIZE);
-
-    for (jsize i = 0; i < count; i++) {
-        docBuffers[i] = docRaw[i].data();
-        metaBuffers[i] = metaRaw[i].data();
-        embBuffers[i] = embRaw[i].data();
-    }
-
-    int result = cactus_index_get(
-        reinterpret_cast<cactus_index_t>(handle),
-        reinterpret_cast<const int*>(idData),
-        static_cast<size_t>(count),
-        docBuffers.data(),
-        docBufferSizes.data(),
-        metaBuffers.data(),
-        metaBufferSizes.data(),
-        embBuffers.data(),
-        embBufferSizes.data()
-    );
-
-    env->ReleaseIntArrayElements(ids, idData, JNI_ABORT);
-
-    if (result < 0) { throwOnError(env); return nullptr; }
-
-    std::string json = "{\"results\":[";
-    for (jsize i = 0; i < count; i++) {
-        if (i > 0) json += ",";
-        json += "{";
-        json += "\"document\":\"" + std::string(docBuffers[i]) + "\"";
-        if (metaBuffers[i][0] != '\0') {
-            json += ",\"metadata\":\"" + std::string(metaBuffers[i]) + "\"";
-        } else {
-            json += ",\"metadata\":null";
-        }
-        json += ",\"embedding\":[";
-        for (size_t j = 0; j < embBufferSizes[i]; j++) {
-            if (j > 0) json += ",";
-            json += std::to_string(embBuffers[i][j]);
-        }
-        json += "]}";
-    }
-    json += "]}";
-
-    return env->NewStringUTF(json.c_str());
+JNIEXPORT void JNICALL
+Java_com_cactus_CactusJNI_nativeTelemetryShutdown(JNIEnv*, jobject) {
+    cactus_telemetry_shutdown();
 }
 
 }

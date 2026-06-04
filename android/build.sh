@@ -7,13 +7,20 @@ ANDROID_DIR="$PROJECT_ROOT/android"
 ANDROID_PLATFORM=${ANDROID_PLATFORM:-android-21}
 CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-Release}
 BUILD_DIR="$ANDROID_DIR/build"
-CACTUS_CURL_ROOT=${CACTUS_CURL_ROOT:-"$PROJECT_ROOT/libs/curl"}
+CACTUS_CURL_ROOT=${CACTUS_CURL_ROOT:-"$PROJECT_ROOT/cactus-engine/libs/curl"}
 
 if [ -z "$ANDROID_NDK_HOME" ]; then
     if [ -n "$ANDROID_HOME" ]; then
         ANDROID_NDK_HOME=$(ls -d "$ANDROID_HOME/ndk/"* 2>/dev/null | sort -V | tail -1)
-    elif [ -d "$HOME/Library/Android/sdk" ]; then
+    fi
+    if [ -z "$ANDROID_NDK_HOME" ] && [ -d "$HOME/Library/Android/sdk" ]; then
         ANDROID_NDK_HOME=$(ls -d "$HOME/Library/Android/sdk/ndk/"* 2>/dev/null | sort -V | tail -1)
+    fi
+    if [ -z "$ANDROID_NDK_HOME" ] && [ -d "/opt/homebrew/Caskroom/android-ndk" ]; then
+        ANDROID_NDK_HOME=$(ls -d /opt/homebrew/Caskroom/android-ndk/*/AndroidNDK*.app/Contents/NDK 2>/dev/null | sort -V | tail -1)
+    fi
+    if [ -z "$ANDROID_NDK_HOME" ] && [ -d "/opt/homebrew/share/android-ndk" ]; then
+        ANDROID_NDK_HOME="/opt/homebrew/share/android-ndk"
     fi
 fi
 

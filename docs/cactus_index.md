@@ -567,7 +567,7 @@ cactus_index_destroy(new_index);
 
 - [Cactus Engine API](/docs/cactus_engine.md) — LLM inference, embeddings (`cactus_embed`), and RAG query APIs
 - [Cactus Graph API](/docs/cactus_graph.md) — Low-level computational graph for custom tensor operations
-- [Python SDK](/python/) — Python bindings with vector index support
-- [Swift SDK](/apple/) — Swift vector index functions
-- [Kotlin/Android SDK](/android/) — Kotlin vector index functions
-- [Flutter SDK](/flutter/) — Dart vector index functions
+- [Python Binding](/python/) — Python bindings with vector index support
+- [Swift Binding](/bindings/swift/) — Swift vector index functions
+- [Kotlin Binding](/bindings/kotlin/) — Kotlin vector index functions
+- [Flutter Binding](/flutter/) — Dart vector index functions

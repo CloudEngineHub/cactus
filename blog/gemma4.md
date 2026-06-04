@@ -122,19 +122,19 @@ The weights download automatically. INT4 quantized, optimized for ARM. Both E2B 
 
 ## Build with it
 
-Cactus supports React Native, Flutter, Swift, Kotlin, Python, Rust, and C++. Pick the SDK that fits your stack:
+Cactus supports React Native, Flutter, Swift, Kotlin, Python, Rust, and C++. Pick the binding that fits your stack:
 
-| Platform | SDK | Install |
+| Platform | Binding | Install |
 |---|---|---|
 | React Native | [cactus-react-native](https://github.com/cactus-compute/cactus-react-native) | `npm install cactus-react-native` |
 | Flutter | [cactus-flutter](https://cactus.dev/flutter/) | Dart FFI bindings |
-| Swift (iOS/macOS) | [cactus-apple](https://cactus.dev/apple/) | XCFramework with NPU support |
-| Kotlin (Android) | [cactus-android](https://cactus.dev/android/) | JNI + Kotlin Multiplatform |
+| Swift (iOS/macOS) | [cactus-swift](https://cactus.dev/swift/) | XCFramework with NPU support |
+| Kotlin (Android) | [cactus-kotlin](https://cactus.dev/kotlin/) | JNI + Kotlin Multiplatform |
 | Python | [cactus-ai](https://cactus.dev/python/) | `pip install cactus-ai` |
 | Rust | [cactus-sys](https://cactus.dev/rust/) | `cargo add cactus-sys` |
 | C++ | [cactus.h](https://cactus.dev/docs/cactus_engine/) | Single header, link `libcactus.a` |
 
-Full quickstart with code examples for every SDK: [cactus.dev/docs/quickstart](https://cactus.dev/docs/quickstart/)
+Full quickstart with code examples for every binding: [cactus.dev/docs/quickstart](https://cactus.dev/docs/quickstart/)
 
 Pre-quantized weights for Gemma 4 and 30+ other models: [huggingface.co/cactus-compute](https://huggingface.co/cactus-compute)
 

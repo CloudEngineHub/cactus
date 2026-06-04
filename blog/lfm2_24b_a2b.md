@@ -214,7 +214,7 @@ Give it a try, build something, and let us know what you think.
 ## See Also
 
 - [Cactus Engine API Reference](/docs/cactus_engine.md) — Full C API docs for completion, tool calling, and cloud handoff
-- [Python SDK](/python/) — Python bindings used in the examples above
+- [Python Binding](/python/) — Python bindings used in the examples above
 - [Fine-tuning Guide](/docs/finetuning.md) — Deploy your own LoRA fine-tunes to mobile
 - [Hybrid Transcription](/blog/hybrid_transcription.md) — On-device/cloud hybrid speech transcription with Cactus
 - [Runtime Compatibility](/docs/compatibility.md) — Weight versioning across Cactus releases

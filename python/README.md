@@ -1,7 +1,7 @@
 ---
-title: "Cactus Python SDK"
-description: "Python bindings for Cactus on-device AI inference engine. Supports chat completion, vision, transcription, embeddings, RAG, tool calling, and streaming."
-keywords: ["Python SDK", "on-device AI", "LLM inference", "Python FFI", "embeddings", "transcription", "RAG"]
+title: "Cactus Python Package"
+description: "Python package and ctypes bindings for the Cactus on-device AI inference engine."
+keywords: ["Python package", "Python bindings", "on-device AI", "Python FFI", "embeddings", "transcription", "RAG"]
 ---
 
 # Cactus Python Package
@@ -32,8 +32,8 @@ cactus auth
 
 <!-- --8<-- [start:example] -->
 ```python
-from src.downloads import ensure_model
-from src.cactus import cactus_init, cactus_complete, cactus_destroy
+from cactus import ensure_model
+from cactus import cactus_init, cactus_complete, cactus_destroy
 import json
 
 # Downloads weights from HuggingFace if not already present
@@ -56,14 +56,13 @@ All functions are module-level and mirror the C FFI directly. Handles are plain 
 Download pre-converted weights programmatically (no CLI needed):
 
 ```python
-from src.downloads import ensure_model, get_weights_dir, download_from_hf
+from cactus import ensure_model, get_weights_dir
 
 # ensure_model downloads if missing, returns Path to weights dir
 weights = ensure_model("openai/whisper-tiny")
 
 # Or check / download manually
 weights_dir = get_weights_dir("openai/whisper-tiny")  # -> Path("weights/whisper-tiny")
-download_from_hf("openai/whisper-tiny", weights_dir, precision="INT4")  # -> bool
 ```
 
 ### Init / Lifecycle
@@ -210,25 +209,12 @@ options = json.dumps({
 result = json.loads(cactus_transcribe(model, "medical_notes.wav", None, options, None, None))
 ```
 
-Streaming transcription:
-Streaming transcription also returns JSON strings:
-
-```python
-stream       = cactus_stream_transcribe_start(model: int, options_json: str | None) -> int
-partial_json = cactus_stream_transcribe_process(stream: int, pcm_data: bytes) -> str
-final_json   = cactus_stream_transcribe_stop(stream: int) -> str
-```
-
-In `cactus_stream_transcribe_process` responses: `confirmed` is the stable text from segments that have been finalised across two consecutive decode passes (potentially replaced by a cloud result); `confirmed_local` is the same text before any cloud substitution; `pending` is the current window's unconfirmed transcription text; `segments` contains timestamped segments for the current audio window.
-
 ```python
 result = json.loads(cactus_transcribe(model, "/path/to/audio.wav", None, None, None, None))
 print(result["response"])
 for seg in result["segments"]:
     print(f"[{seg['start']:.3f}s - {seg['end']:.3f}s] {seg['text']}")
 ```
-
-Streaming also accepts `custom_vocabulary` in the options passed to `cactus_stream_transcribe_start`. The bias is applied for the lifetime of the stream session.
 
 ### Embeddings
 
@@ -258,54 +244,6 @@ result_json = cactus_detect_language(
 
 Returns a JSON string with fields: `success`, `error`, `language` (BCP-47 code), `language_token`, `token_id`, `confidence`, `entropy`, `total_time_ms`, `ram_usage_mb`.
 
-### VAD
-
-```python
-result_json = cactus_vad(
-    model: int,
-    audio_path: str | None,
-    options_json: str | None,
-    pcm_data: bytes | None
-) -> str
-```
-
-Returns a JSON string: `{"success":true,"error":null,"segments":[{"start":<sample_index>,"end":<sample_index>},...],"total_time_ms":...,"ram_usage_mb":...}`. VAD segments contain only `start` and `end` as integer sample indices — no `text` field.
-
-### Diarize
-
-```python
-result_json = cactus_diarize(
-    model: int,
-    audio_path: str | None,
-    options_json: str | None,
-    pcm_data: bytes | None
-) -> str
-```
-
-Options (all optional):
-- `step_ms` (int, default 1000) — sliding window stride in milliseconds
-- `threshold` (float) — zero out per-speaker scores below this value (`segmentation.threshold` in Python pipeline)
-- `num_speakers` (int) — keep only the N most active speakers
-- `min_speakers` (int) — minimum number of speakers to retain
-- `max_speakers` (int) — maximum number of speakers to retain
-- `raw_powerset` (bool, default false) — return raw 7-class powerset scores instead of 3-speaker probabilities
-
-Returns `{"success":true,"error":null,"num_speakers":3,"scores":[...],"total_time_ms":...,"ram_usage_mb":...}`. The `scores` field is a flat array of T×3 float32 values (index `f*3+s`), one per output frame per speaker, each in [0,1]. When `raw_powerset` is true, `num_speakers` is 7 and `scores` contains T×7 raw powerset class scores (speaker filtering and thresholding are skipped).
-
-### Embed Speaker
-
-```python
-result_json = cactus_embed_speaker(
-    model: int,
-    audio_path: str | None,
-    options_json: str | None,
-    pcm_data: bytes | None,
-    mask_weights: list[float] | None = None
-) -> str
-```
-
-Returns a JSON string: `{"success":true,"error":null,"embedding":[<float>, ...],"total_time_ms":...,"ram_usage_mb":...}`. The embedding is a 256-dimensional speaker vector from the WeSpeaker ResNet34-LM model. When `mask_weights` is provided (a per-frame weight array from diarization), the embedding is extracted using weighted stats pooling for speaker-specific embeddings.
-
 ### RAG
 
 ```python
@@ -327,7 +265,7 @@ Returns a JSON string with a `chunks` array. Each chunk has `score` (float), `so
 ```python
 index = cactus_index_init(index_dir: str, embedding_dim: int) -> int
 cactus_index_add(index: int, ids: list[int], documents: list[str],
-                 embeddings: list[list[float]], metadatas: list[str] | None)
+                 metadatas: list[str] | None, embeddings: list[list[float]])
 cactus_index_delete(index: int, ids: list[int])
 result_json = cactus_index_get(index: int, ids: list[int]) -> str
 result_json = cactus_index_query(index: int, embedding: list[float], options_json: str | None) -> str
@@ -397,7 +335,7 @@ result = json.loads(cactus_complete(model, messages, None, None, None))
 The `Graph` API provides a tensor computation graph for building and executing dataflow pipelines on the Cactus kernel layer:
 
 ```python
-from src.graph import Graph
+from cactus.bindings.graph import Graph
 import numpy as np
 
 g = Graph()
@@ -430,10 +368,13 @@ Tests are in `python/tests/`:
 
 ## See Also
 
-- [Cactus Engine API](/docs/cactus_engine.md) — Full C API reference that the Python bindings wrap
-- [Cactus Index API](/docs/cactus_index.md) — Vector database API for RAG applications
-- [Fine-tuning Guide](/docs/finetuning.md) — Train and deploy custom LoRA fine-tunes
-- [Runtime Compatibility](/docs/compatibility.md) — Weight versioning across releases
-- [Swift SDK](/apple/) — Swift bindings for iOS/macOS
-- [Kotlin/Android SDK](/android/) — Kotlin bindings for Android
-- [Flutter SDK](/flutter/) — Dart bindings for cross-platform mobile
+- `Cactus Engine API` — Full C API reference that the Python bindings wrap
+- `Cactus Index API` — Vector database API for RAG applications
+- `Fine-tuning Guide` — Train and deploy custom LoRA fine-tunes
+- `Runtime Compatibility` — Weight versioning across releases
+- [Apple Build Step](/apple/) — Builds Apple native artifacts used by bindings
+- [Android Build Step](/android/) — Builds Android native artifacts used by bindings
+- [Swift Bindings](/bindings/swift/) — Swift C-module bindings
+- [Kotlin Bindings](/bindings/kotlin/) — Kotlin/JNI bindings
+- [Flutter Bindings](/bindings/flutter/) — Dart FFI bindings
+- [Rust Bindings](/bindings/rust/) — Raw Rust FFI declarations

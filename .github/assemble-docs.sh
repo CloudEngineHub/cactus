@@ -13,7 +13,8 @@ fi
 
 rm -rf site_docs
 mkdir -p site_docs/docs site_docs/python site_docs/apple site_docs/android \
-         site_docs/flutter site_docs/rust site_docs/blog site_docs/assets
+         site_docs/flutter site_docs/rust site_docs/swift site_docs/kotlin \
+         site_docs/blog site_docs/assets
 
 cp -r assets/* site_docs/assets/
 
@@ -31,7 +32,9 @@ cp docs/*.md site_docs/docs/
 cp python/README.md site_docs/python/README.md
 cp apple/README.md site_docs/apple/README.md
 cp android/README.md site_docs/android/README.md
-cp flutter/README.md site_docs/flutter/README.md
+cp bindings/flutter/README.md site_docs/flutter/README.md
+cp bindings/swift/README.md site_docs/swift/README.md
+cp bindings/kotlin/README.md site_docs/kotlin/README.md
 
 mkdir -p site_docs/react-native
 if curl -sfL "https://raw.githubusercontent.com/cactus-compute/cactus-react-native/main/README.md" -o site_docs/react-native/README.md; then
@@ -54,9 +57,7 @@ else
   echo "Warning: Could not fetch React Native README, using fallback"
 fi
 
-if [ -f rust/README.md ]; then
-  cp rust/README.md site_docs/rust/README.md
-fi
+cp bindings/rust/README.md site_docs/rust/README.md
 
 if [ -d blog ] && ls blog/*.md >/dev/null 2>&1; then
   cp blog/*.md site_docs/blog/
@@ -76,9 +77,19 @@ sedi 's/^# Cactus$//' site_docs/index.md
 sedi 's|(cactus_engine\.md)|(docs/cactus_engine.md)|g' site_docs/index.md
 sedi 's|(cactus_graph\.md)|(docs/cactus_graph.md)|g' site_docs/index.md
 sedi 's|(cactus_index\.md)|(docs/cactus_index.md)|g' site_docs/index.md
+sedi 's|(cactus_kernels\.md)|(docs/cactus_kernels.md)|g' site_docs/index.md
+sedi 's|(cactus_quants\.md)|(docs/cactus_quants.md)|g' site_docs/index.md
+sedi 's|(cactus_transpiler\.md)|(docs/cactus_transpiler.md)|g' site_docs/index.md
+sedi 's|(cactus_hybrid\.md)|(docs/cactus_hybrid.md)|g' site_docs/index.md
 sedi 's|(finetuning\.md)|(docs/finetuning.md)|g' site_docs/index.md
 sedi 's|(compatibility\.md)|(docs/compatibility.md)|g' site_docs/index.md
 sedi 's|(/CONTRIBUTING\.md)|(CONTRIBUTING.md)|g' site_docs/index.md
+sedi 's|(/bindings/swift/)|(swift/README.md)|g' site_docs/index.md
+sedi 's|(/bindings/kotlin/)|(kotlin/README.md)|g' site_docs/index.md
+sedi 's|(/bindings/python/)|(python/README.md)|g' site_docs/index.md
+sedi 's|(/bindings/react-native/)|(react-native/README.md)|g' site_docs/index.md
+sedi 's|(/bindings/flutter/)|(flutter/README.md)|g' site_docs/index.md
+sedi 's|(/bindings/rust/)|(rust/README.md)|g' site_docs/index.md
 sedi 's|(/python/)|(python/README.md)|g' site_docs/index.md
 sedi 's|(/apple/)|(apple/README.md)|g' site_docs/index.md
 sedi 's|(/android/)|(android/README.md)|g' site_docs/index.md
@@ -91,18 +102,28 @@ sedi 's|(/blog/lfm2\.5_350m\.md)|(blog/lfm2.5_350m.md)|g' site_docs/index.md
 sedi 's|(/blog/gemma4\.md)|(blog/gemma4.md)|g' site_docs/index.md
 sedi 's|(/blog/turboquant-h\.md)|(blog/turboquant-h.md)|g' site_docs/index.md
 sedi 's|(quickstart\.md)|(docs/quickstart.md)|g' site_docs/index.md
-sedi 's|(choose-sdk\.md)|(docs/choose-sdk.md)|g' site_docs/index.md
+sedi 's|(choose-bindings\.md)|(docs/choose-bindings.md)|g' site_docs/index.md
 
 for f in site_docs/docs/*.md; do
   sedi 's|(/docs/cactus_engine\.md)|(cactus_engine.md)|g' "$f"
   sedi 's|(/docs/cactus_graph\.md)|(cactus_graph.md)|g' "$f"
   sedi 's|(/docs/cactus_index\.md)|(cactus_index.md)|g' "$f"
+  sedi 's|(/docs/cactus_kernels\.md)|(cactus_kernels.md)|g' "$f"
+  sedi 's|(/docs/cactus_quants\.md)|(cactus_quants.md)|g' "$f"
+  sedi 's|(/docs/cactus_transpiler\.md)|(cactus_transpiler.md)|g' "$f"
+  sedi 's|(/docs/cactus_hybrid\.md)|(cactus_hybrid.md)|g' "$f"
   sedi 's|(/docs/finetuning\.md)|(finetuning.md)|g' "$f"
   sedi 's|(/docs/compatibility\.md)|(compatibility.md)|g' "$f"
   sedi 's|(/docs/quickstart\.md)|(quickstart.md)|g' "$f"
-  sedi 's|(/docs/choose-sdk\.md)|(choose-sdk.md)|g' "$f"
+  sedi 's|(/docs/choose-bindings\.md)|(choose-bindings.md)|g' "$f"
   sedi 's|(/docs/index\.md)|(../index.md)|g' "$f"
   sedi 's|(/CONTRIBUTING\.md)|(../CONTRIBUTING.md)|g' "$f"
+  sedi 's|(/bindings/swift/)|(../swift/README.md)|g' "$f"
+  sedi 's|(/bindings/kotlin/)|(../kotlin/README.md)|g' "$f"
+  sedi 's|(/bindings/python/)|(../python/README.md)|g' "$f"
+  sedi 's|(/bindings/react-native/)|(../react-native/README.md)|g' "$f"
+  sedi 's|(/bindings/flutter/)|(../flutter/README.md)|g' "$f"
+  sedi 's|(/bindings/rust/)|(../rust/README.md)|g' "$f"
   sedi 's|(/python/)|(../python/README.md)|g' "$f"
   sedi 's|(/apple/)|(../apple/README.md)|g' "$f"
   sedi 's|(/android/)|(../android/README.md)|g' "$f"
@@ -110,14 +131,24 @@ for f in site_docs/docs/*.md; do
   sedi 's|(/rust/)|(../rust/README.md)|g' "$f"
 done
 
-for f in site_docs/python/README.md site_docs/apple/README.md site_docs/android/README.md site_docs/flutter/README.md; do
+for f in site_docs/python/README.md site_docs/apple/README.md site_docs/android/README.md site_docs/flutter/README.md site_docs/swift/README.md site_docs/kotlin/README.md; do
   sedi 's|(/docs/cactus_engine\.md)|(../docs/cactus_engine.md)|g' "$f"
   sedi 's|(/docs/cactus_graph\.md)|(../docs/cactus_graph.md)|g' "$f"
   sedi 's|(/docs/cactus_index\.md)|(../docs/cactus_index.md)|g' "$f"
+  sedi 's|(/docs/cactus_kernels\.md)|(../docs/cactus_kernels.md)|g' "$f"
+  sedi 's|(/docs/cactus_quants\.md)|(../docs/cactus_quants.md)|g' "$f"
+  sedi 's|(/docs/cactus_transpiler\.md)|(../docs/cactus_transpiler.md)|g' "$f"
+  sedi 's|(/docs/cactus_hybrid\.md)|(../docs/cactus_hybrid.md)|g' "$f"
   sedi 's|(/docs/finetuning\.md)|(../docs/finetuning.md)|g' "$f"
   sedi 's|(/docs/compatibility\.md)|(../docs/compatibility.md)|g' "$f"
   sedi 's|(/docs/quickstart\.md)|(../docs/quickstart.md)|g' "$f"
-  sedi 's|(/docs/choose-sdk\.md)|(../docs/choose-sdk.md)|g' "$f"
+  sedi 's|(/docs/choose-bindings\.md)|(../docs/choose-bindings.md)|g' "$f"
+  sedi 's|(/bindings/swift/)|(../swift/README.md)|g' "$f"
+  sedi 's|(/bindings/kotlin/)|(../kotlin/README.md)|g' "$f"
+  sedi 's|(/bindings/python/)|(../python/README.md)|g' "$f"
+  sedi 's|(/bindings/react-native/)|(../react-native/README.md)|g' "$f"
+  sedi 's|(/bindings/flutter/)|(../flutter/README.md)|g' "$f"
+  sedi 's|(/bindings/rust/)|(../rust/README.md)|g' "$f"
   sedi 's|(/python/)|(../python/README.md)|g' "$f"
   sedi 's|(/apple/)|(../apple/README.md)|g' "$f"
   sedi 's|(/android/)|(../android/README.md)|g' "$f"
@@ -131,10 +162,20 @@ if [ -f site_docs/rust/README.md ]; then
     's|(/docs/cactus_engine\.md)|(../docs/cactus_engine.md)|g' \
     's|(/docs/cactus_graph\.md)|(../docs/cactus_graph.md)|g' \
     's|(/docs/cactus_index\.md)|(../docs/cactus_index.md)|g' \
+    's|(/docs/cactus_kernels\.md)|(../docs/cactus_kernels.md)|g' \
+    's|(/docs/cactus_quants\.md)|(../docs/cactus_quants.md)|g' \
+    's|(/docs/cactus_transpiler\.md)|(../docs/cactus_transpiler.md)|g' \
+    's|(/docs/cactus_hybrid\.md)|(../docs/cactus_hybrid.md)|g' \
     's|(/docs/finetuning\.md)|(../docs/finetuning.md)|g' \
     's|(/docs/compatibility\.md)|(../docs/compatibility.md)|g' \
     's|(/docs/quickstart\.md)|(../docs/quickstart.md)|g' \
-    's|(/docs/choose-sdk\.md)|(../docs/choose-sdk.md)|g' \
+    's|(/docs/choose-bindings\.md)|(../docs/choose-bindings.md)|g' \
+    's|(/bindings/swift/)|(../swift/README.md)|g' \
+    's|(/bindings/kotlin/)|(../kotlin/README.md)|g' \
+    's|(/bindings/python/)|(../python/README.md)|g' \
+    's|(/bindings/react-native/)|(../react-native/README.md)|g' \
+    's|(/bindings/flutter/)|(../flutter/README.md)|g' \
+    's|(/bindings/rust/)|(../rust/README.md)|g' \
     's|(/python/)|(../python/README.md)|g' \
     's|(/apple/)|(../apple/README.md)|g' \
     's|(/android/)|(../android/README.md)|g' \
@@ -150,8 +191,18 @@ if ls site_docs/blog/*.md >/dev/null 2>&1; then
     sedi 's|(/docs/cactus_engine\.md)|(../docs/cactus_engine.md)|g' "$f"
     sedi 's|(/docs/cactus_graph\.md)|(../docs/cactus_graph.md)|g' "$f"
     sedi 's|(/docs/cactus_index\.md)|(../docs/cactus_index.md)|g' "$f"
+    sedi 's|(/docs/cactus_kernels\.md)|(../docs/cactus_kernels.md)|g' "$f"
+    sedi 's|(/docs/cactus_quants\.md)|(../docs/cactus_quants.md)|g' "$f"
+    sedi 's|(/docs/cactus_transpiler\.md)|(../docs/cactus_transpiler.md)|g' "$f"
+    sedi 's|(/docs/cactus_hybrid\.md)|(../docs/cactus_hybrid.md)|g' "$f"
     sedi 's|(/docs/finetuning\.md)|(../docs/finetuning.md)|g' "$f"
     sedi 's|(/docs/compatibility\.md)|(../docs/compatibility.md)|g' "$f"
+    sedi 's|(/bindings/swift/)|(../swift/README.md)|g' "$f"
+    sedi 's|(/bindings/kotlin/)|(../kotlin/README.md)|g' "$f"
+    sedi 's|(/bindings/python/)|(../python/README.md)|g' "$f"
+    sedi 's|(/bindings/react-native/)|(../react-native/README.md)|g' "$f"
+    sedi 's|(/bindings/flutter/)|(../flutter/README.md)|g' "$f"
+    sedi 's|(/bindings/rust/)|(../rust/README.md)|g' "$f"
     sedi 's|(/python/)|(../python/README.md)|g' "$f"
     sedi 's|(/apple/)|(../apple/README.md)|g' "$f"
     sedi 's|(/android/)|(../android/README.md)|g' "$f"
@@ -170,6 +221,10 @@ if [ -f site_docs/CONTRIBUTING.md ]; then
   sedi 's|(/docs/cactus_engine\.md)|(docs/cactus_engine.md)|g' site_docs/CONTRIBUTING.md
   sedi 's|(/docs/cactus_graph\.md)|(docs/cactus_graph.md)|g' site_docs/CONTRIBUTING.md
   sedi 's|(/docs/cactus_index\.md)|(docs/cactus_index.md)|g' site_docs/CONTRIBUTING.md
+  sedi 's|(/docs/cactus_kernels\.md)|(docs/cactus_kernels.md)|g' site_docs/CONTRIBUTING.md
+  sedi 's|(/docs/cactus_quants\.md)|(docs/cactus_quants.md)|g' site_docs/CONTRIBUTING.md
+  sedi 's|(/docs/cactus_transpiler\.md)|(docs/cactus_transpiler.md)|g' site_docs/CONTRIBUTING.md
+  sedi 's|(/docs/cactus_hybrid\.md)|(docs/cactus_hybrid.md)|g' site_docs/CONTRIBUTING.md
   sedi 's|(/docs/index\.md)|(index.md)|g' site_docs/CONTRIBUTING.md
 fi
 
@@ -184,6 +239,8 @@ fi
 
 for nav_path in \
   "rust/README.md" \
+  "swift/README.md" \
+  "kotlin/README.md" \
   "react-native/README.md" \
   "blog/README.md" \
   "blog/hybrid_transcription.md" \
