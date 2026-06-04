@@ -86,8 +86,6 @@ static void asr_token_callback(const char* token, uint32_t, void*) {
     NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
     [self copyFromBundle:bundlePath toDocuments:getenv("CACTUS_TEST_MODEL")];
     [self copyFromBundle:bundlePath toDocuments:getenv("CACTUS_TEST_TRANSCRIBE_MODEL")];
-    [self copyFromBundle:bundlePath toDocuments:getenv("CACTUS_TEST_WHISPER_MODEL")];
-    [self copyFromBundle:bundlePath toDocuments:getenv("CACTUS_TEST_VAD_MODEL")];
     [self copyFromBundle:bundlePath toDocuments:getenv("CACTUS_TEST_ASSETS")];
     [self copyFromBundle:bundlePath toDocuments:getenv("CACTUS_ASR_AUDIO_FILE")];
 

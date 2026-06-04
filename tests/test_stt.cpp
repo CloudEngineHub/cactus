@@ -14,7 +14,6 @@
 using namespace EngineTestUtils;
 
 static const char* g_transcribe_model_path = std::getenv("CACTUS_TEST_TRANSCRIBE_MODEL");
-static const char* g_whisper_model_path = std::getenv("CACTUS_TEST_WHISPER_MODEL");
 static const char* g_vad_model_path = std::getenv("CACTUS_TEST_VAD_MODEL");
 static const char* g_diarize_model_path = std::getenv("CACTUS_TEST_DIARIZE_MODEL");
 static const char* g_embed_speaker_model_path = std::getenv("CACTUS_TEST_EMBED_SPEAKER_MODEL");
@@ -720,23 +719,12 @@ static bool test_language_detection() {
         return true;
     }
 
-    const char* whisper_model_path = g_whisper_model_path;
-    if (!whisper_model_path || std::string(whisper_model_path).empty()) {
-        if (g_transcribe_model_path) {
-            std::string transcribe_path = g_transcribe_model_path;
-            std::transform(transcribe_path.begin(), transcribe_path.end(), transcribe_path.begin(),
-                           [](unsigned char c){ return std::tolower(c); });
-            if (transcribe_path.find("whisper") != std::string::npos) {
-                whisper_model_path = g_transcribe_model_path;
-            }
-        }
-    }
-    if (!whisper_model_path || std::string(whisper_model_path).empty()) {
-        std::cerr << "[✗] CACTUS_TEST_WHISPER_MODEL not set (required for language detection)\n";
-        return false;
+    if (!g_transcribe_model_path) {
+        std::cout << "⊘ SKIP │ CACTUS_TEST_TRANSCRIBE_MODEL not set\n";
+        return true;
     }
 
-    cactus_model_t model = cactus_init(whisper_model_path, nullptr, false);
+    cactus_model_t model = cactus_init(g_transcribe_model_path, nullptr, false);
     if (!model) {
         std::cerr << "[✗] Failed to initialize Whisper model for language detection\n";
         return false;

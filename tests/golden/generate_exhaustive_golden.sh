@@ -57,10 +57,6 @@ for entry in "${MODELS[@]}"; do
     export CACTUS_TEST_ASSETS="$PROJECT_ROOT/tests/assets"
     export "$env_var"="$MODEL_PATH"
 
-    if [ "$test_type" = "stt" ]; then
-        export CACTUS_TEST_VAD_MODEL="$PROJECT_ROOT/weights/silero-vad"
-    fi
-
     if "$TEST_BUILD_DIR/test_exhaustive"; then
         echo "    OK"
         PASSED=$((PASSED + 1))

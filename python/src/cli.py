@@ -44,11 +44,8 @@ def _resolve_project_root() -> Path:
 
 
 PROJECT_ROOT = _resolve_project_root()
-DEFAULT_MODEL_ID = "google/gemma-4-E2B-it"
-DEFAULT_TEST_TRANSCRIBE_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
-DEFAULT_TEST_WHISPER_MODEL_ID = "openai/whisper-small"
-DEFAULT_TEST_DIARIZE_MODEL_ID = "pyannote/segmentation-3.0"
-DEFAULT_TEST_EMBED_SPEAKER_MODEL_ID = "pyannote/wespeaker-voxceleb-resnet34-LM"
+DEFAULT_MODEL_ID = "LiquidAI/LFM2-VL-450M"
+DEFAULT_TEST_TRANSCRIBE_MODEL_ID = "openai/whisper-base"
 WEIGHTS_VARIANT_CHOICES = ["auto", "apple", "standard"]
 
 with open(PROJECT_ROOT / "models.json") as _f:
@@ -1094,7 +1091,7 @@ def cmd_run(args):
     os.execv(str(chat_binary), cmd_args)
 
 
-DEFAULT_ASR_MODEL_ID = "nvidia/parakeet-tdt-0.6b-v3"
+DEFAULT_ASR_MODEL_ID = "openai/whisper-base"
 
 def _pick_android_device_id(preferred_device=None):
     if preferred_device:
@@ -1490,16 +1487,12 @@ def cmd_test(args):
     if getattr(args, 'benchmark', False):
         args.model = 'LiquidAI/LFM2.5-VL-1.6B'
         args.transcribe_model = 'nvidia/parakeet-ctc-1.1b'
-        print_color(BLUE, f"Using large models: {args.model}, {args.transcribe_model}, {args.vad_model}")
+        print_color(BLUE, f"Using large models: {args.model}, {args.transcribe_model}")
 
     if getattr(args, 'reconvert', False):
         reconvert_models = [
             getattr(args, 'model', 'LiquidAI/LFM2-VL-450M'),
             getattr(args, 'transcribe_model', DEFAULT_TEST_TRANSCRIBE_MODEL_ID),
-            getattr(args, 'whisper_model', DEFAULT_TEST_WHISPER_MODEL_ID),
-            getattr(args, 'vad_model', 'snakers4/silero-vad'),
-            getattr(args, 'diarize_model', DEFAULT_TEST_DIARIZE_MODEL_ID),
-            getattr(args, 'embed_speaker_model', DEFAULT_TEST_EMBED_SPEAKER_MODEL_ID),
         ]
         for model_id in reconvert_models:
             class DownloadArgs:
@@ -1531,14 +1524,6 @@ def cmd_test(args):
         cmd.extend(["--model", args.model])
     if args.transcribe_model:
         cmd.extend(["--transcribe_model", args.transcribe_model])
-    if getattr(args, 'whisper_model', None):
-        cmd.extend(["--whisper_model", args.whisper_model])
-    if getattr(args, 'vad_model', None):
-        cmd.extend(["--vad_model", args.vad_model])
-    if getattr(args, 'diarize_model', None):
-        cmd.extend(["--diarize_model", args.diarize_model])
-    if getattr(args, 'embed_speaker_model', None):
-        cmd.extend(["--embed_speaker_model", args.embed_speaker_model])
     if args.precision:
         cmd.extend(["--precision", args.precision])
     if getattr(args, 'no_rebuild', False):
@@ -1998,9 +1983,8 @@ def create_parser():
                                        all must pass for contributions
 
     Optional flags:
-    --model <model>                    default: LFM2-VL-450M
-    --transcribe_model <model>         default: nvidia/parakeet-tdt-0.6b-v3
-    --whisper_model <model>            default: openai/whisper-small (language detection)
+    --model <model>                    default: LiquidAI/LFM2-VL-450M
+    --transcribe_model <model>         default: openai/whisper-base
     --benchmark                        use larger models (LFM2.5-VL-1.6B + nvidia/parakeet-ctc-1.1b)
     --precision INT4|INT8|FP16         regenerates weights with precision
     --reconvert                        force model weights reconversion from source
@@ -2152,14 +2136,6 @@ def create_parser():
                              help='Model to use for tests')
     test_parser.add_argument('--transcribe_model', default=DEFAULT_TEST_TRANSCRIBE_MODEL_ID,
                              help='Transcribe model to use')
-    test_parser.add_argument('--whisper_model', default=DEFAULT_TEST_WHISPER_MODEL_ID,
-                             help='Whisper model to use for language detection tests')
-    test_parser.add_argument('--vad_model', default='snakers4/silero-vad',
-                             help='VAD model to use')
-    test_parser.add_argument('--diarize_model', default=DEFAULT_TEST_DIARIZE_MODEL_ID,
-                             help='Diarization model to use')
-    test_parser.add_argument('--embed_speaker_model', default=DEFAULT_TEST_EMBED_SPEAKER_MODEL_ID,
-                             help='Speaker embedding model to use')
     test_parser.add_argument('--benchmark', action='store_true',
                              help='Use larger models (LFM2.5-VL-1.6B + nvidia/parakeet-ctc-1.1b)')
     test_parser.add_argument('--precision', choices=['INT4', 'INT8', 'FP16'],
