@@ -680,8 +680,6 @@ __attribute__((always_inline)) static inline void cactus_quant_sdot_gemv_int8(
         const uint32_t n_vecs = gs / 16;
         const size_t n_start4 = cache_block * 4;
 
-        // Set up per-row state once. Avoids the 1KB exp4 stack temporary that
-        // the previous structure forced.
         const uint8_t* row_ptrs[4];
         bool row_valid[4];
         for (size_t ni = 0; ni < 4; ++ni) {
@@ -696,8 +694,6 @@ __attribute__((always_inline)) static inline void cactus_quant_sdot_gemv_int8(
             }
         }
 
-        // Stream: unpack 4 rows' chunks and interleave + store in lockstep.
-        // Each iteration keeps 4 (or 8 with wider) int8x16_t in registers, no stack temp.
         uint32_t v = 0;
         for (; v + 1 < n_vecs; v += 2) {
             int8x16_t r0a, r0b, r1a, r1b, r2a, r2b, r3a, r3b;
