@@ -121,8 +121,35 @@ def create_parser():
 
   cactus transpile <model>             build a runnable bundle from CQ weights
     --weights-dir <path>               path to CQ weights (default: weights/<model>)
-    --task <auto|...>                  force task type (default: auto)
+    --task <auto|...>                  task (default: auto, inferred from model config)
     --artifact-dir <path>              write bundle here (default: weights/<model>)
+    --prompt <text>                    representative prompt for shape capture
+    --system-prompt <text>             system prompt for multimodal chat
+    --enable-thinking                  enable thinking markers when supported
+    --input-ids <a,b,...>              token ids for causal-LM shape capture
+    --image-file <path>                representative image (repeatable)
+    --audio-file <path>                representative audio file (WAV)
+    --max-new-tokens <n>               preallocate decode context for causal LM
+    --component-pipeline auto|on|off   force component-pipeline transpilation
+    --components <a,b,...>             subset of components to transpile
+    --torch-dtype <dtype>              float16 | float32 | bfloat16
+    --token <token>                    HuggingFace token (defaults to $HF_TOKEN)
+    --trust-remote-code                allow HF remote code at transpile time
+    --local-files-only                 require model/processor to be local
+    --allow-unconverted-weights        debug-only: skip the CQ-weights check
+    --execute-after-transpile          run a reference execution after lowering
+    --graph-filename <name>            override saved graph filename
+    --skip-reference-compare           skip PyTorch comparison (with --execute-…)
+    --no-fuse-rms-norm                 disable RMSNorm fusion
+    --no-fuse-rope                     disable RoPE fusion
+    --no-fuse-attention                disable attention fusion
+    --no-fuse-attention-block          disable attention-block fusion
+    --no-fuse-add-clipped              disable add-clipped fusion
+    --no-fuse-gated-deltanet           disable gated DeltaNet fusion
+    --npu                              also emit CoreML .mlpackage(s) for NPU
+    --npu-quantize 0|4|8               force both NPU encoders to this quant
+    --npu-audio-quantize 0|4|8         audio encoder quant (default int8)
+    --npu-vision-quantize 0|4|8        vision encoder quant (default fp16)
 
   cactus serve [model]                 OpenAI-compatible local HTTP server
     --host <addr>                      bind address (default: 127.0.0.1)
@@ -289,44 +316,71 @@ def create_parser():
     transpile_parser = subparsers.add_parser("transpile",
                                              help="Build a runnable bundle from CQ weights")
     transpile_parser.add_argument("model_id", type=_hf_id_or_path,
-                                  help="HuggingFace model id (e.g. openai/whisper-base) or local PyTorch checkpoint path")
+                                  help="HuggingFace model id or local checkpoint path")
     transpile_parser.add_argument("--weights-dir",
-                                  help="Path to converted CQ weights (default: weights/<model_name>)")
+                                  help="CQ weights directory (default: weights/<model>)")
     transpile_parser.add_argument("--task", default="auto",
                                   choices=["auto", "causal_lm_logits", "multimodal_causal_lm_logits",
                                            "ctc_logits", "encoder_hidden_states",
                                            "seq2seq_transcription", "tdt_transcription"],
-                                  help="Transpile task (default: auto, inferred from weights)")
+                                  help="Transpile task (default: auto, from model config)")
     transpile_parser.add_argument("--prompt",
-                                  help="Representative prompt for causal/multimodal graph shape capture")
+                                  help="Prompt for causal/multimodal shape capture")
+    transpile_parser.add_argument("--system-prompt", default=None,
+                                  help="System prompt for multimodal chat formats")
+    transpile_parser.add_argument("--enable-thinking", action="store_true",
+                                  help="Enable thinking markers when the prompt supports them")
+    transpile_parser.add_argument("--input-ids", default=None,
+                                  help="Comma-separated token ids for causal-LM shape capture")
     transpile_parser.add_argument("--image-file", action="append", default=[],
-                                  help="Representative image file for multimodal transpile (repeatable)")
+                                  help="Image for multimodal shape capture (repeatable)")
     transpile_parser.add_argument("--audio-file",
-                                  help="Representative audio file for audio/multimodal transpile")
+                                  help="Audio file (WAV) for audio/multimodal shape capture")
     transpile_parser.add_argument("--max-new-tokens", type=_positive_int, default=None,
-                                  help="Generation room to preallocate for causal decode graphs")
+                                  help="Decode context to preallocate for causal LM (default: 32)")
     transpile_parser.add_argument("--component-pipeline", default="auto", choices=["auto", "on", "off"],
-                                  help="Use split component graph transpilation when supported")
+                                  help="Split-component transpilation when supported (default: auto)")
     transpile_parser.add_argument("--components",
-                                  help="Comma-separated component subset for component-pipeline models")
+                                  help="Comma-separated component subset (e.g. vision_encoder,decoder)")
+    transpile_parser.add_argument("--torch-dtype", default=None,
+                                  choices=["float16", "float32", "bfloat16"],
+                                  help="Torch dtype for HF loading (default: float16)")
+    transpile_parser.add_argument("--token", default=None,
+                                  help="HuggingFace token for gated models (default: $HF_TOKEN)")
     transpile_parser.add_argument("--trust-remote-code", action="store_true",
-                                  help="Allow HF remote code during the transpile phase")
+                                  help="Pass trust_remote_code=True to HF loaders")
     transpile_parser.add_argument("--local-files-only", action="store_true",
-                                  help="Require HF model/processor files to already be local during transpile")
+                                  help="Require model/processor to already be local")
     transpile_parser.add_argument("--allow-unconverted-weights", action="store_true",
-                                  help="Transpile against an unconverted source checkpoint (skip the CQ weights check)")
+                                  help="Debug: transpile without CQ weights")
     transpile_parser.add_argument("--execute-after-transpile", action="store_true",
-                                  help="Run a reference execution against the produced bundle after transpiling")
+                                  help="Run a reference execution after lowering")
     transpile_parser.add_argument("--artifact-dir",
                                   help="Output directory (default: weights/<model>)")
+    transpile_parser.add_argument("--graph-filename", default=None,
+                                  help="Saved graph filename (default: graph.cactus)")
     transpile_parser.add_argument("--skip-reference-compare", action="store_true",
-                                  help="Skip PyTorch vs transpiled output comparison")
+                                  help="Skip PyTorch comparison (requires --execute-after-transpile)")
     transpile_parser.add_argument("--no-fuse-rms-norm", action="store_true",
                                   help="Disable RMSNorm fusion")
     transpile_parser.add_argument("--no-fuse-rope", action="store_true",
                                   help="Disable RoPE fusion")
     transpile_parser.add_argument("--no-fuse-attention", action="store_true",
                                   help="Disable attention fusion")
+    transpile_parser.add_argument("--no-fuse-attention-block", action="store_true",
+                                  help="Disable attention-block fusion")
+    transpile_parser.add_argument("--no-fuse-add-clipped", action="store_true",
+                                  help="Disable add-clipped fusion")
+    transpile_parser.add_argument("--no-fuse-gated-deltanet", action="store_true",
+                                  help="Disable gated DeltaNet fusion")
+    transpile_parser.add_argument("--npu", action="store_true",
+                                  help="Also emit CoreML .mlpackage(s) for Apple NPU encoders")
+    transpile_parser.add_argument("--npu-quantize", type=int, choices=[0, 4, 8], default=None,
+                                  help="Legacy: force both NPU encoders to same quant (0=fp16, 4=int4, 8=int8)")
+    transpile_parser.add_argument("--npu-audio-quantize", type=int, choices=[0, 4, 8], default=None,
+                                  help="NPU audio encoder quant: 0=fp16, 4=int4, 8=int8 (default: 8)")
+    transpile_parser.add_argument("--npu-vision-quantize", type=int, choices=[0, 4, 8], default=None,
+                                  help="NPU vision encoder quant: 0=fp16, 4=int4, 8=int8 (default: 0; int4 degrades Gemma4 vision)")
 
     return parser
 

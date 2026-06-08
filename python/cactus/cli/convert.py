@@ -87,6 +87,12 @@ def cmd_transpile(args):
         extra_args.extend(["--task", args.task])
     if args.prompt is not None:
         extra_args.extend(["--prompt", args.prompt])
+    if args.system_prompt is not None:
+        extra_args.extend(["--system-prompt", args.system_prompt])
+    if args.enable_thinking:
+        extra_args.append("--enable-thinking")
+    if args.input_ids is not None:
+        extra_args.extend(["--input-ids", args.input_ids])
 
     image_files = list(args.image_file or [])
     audio_file = args.audio_file
@@ -107,12 +113,18 @@ def cmd_transpile(args):
         extra_args.extend(["--component-pipeline", args.component_pipeline])
     if args.components:
         extra_args.extend(["--components", args.components])
+    if args.torch_dtype:
+        extra_args.extend(["--torch-dtype", args.torch_dtype])
+    if args.token:
+        extra_args.extend(["--token", args.token])
     if args.trust_remote_code:
         extra_args.append("--trust-remote-code")
     if args.local_files_only:
         extra_args.append("--local-files-only")
     if args.artifact_dir:
         extra_args.extend(["--artifact-dir", args.artifact_dir])
+    if args.graph_filename:
+        extra_args.extend(["--graph-filename", args.graph_filename])
     if args.skip_reference_compare:
         extra_args.append("--skip-reference-compare")
     if args.no_fuse_rms_norm:
@@ -121,6 +133,20 @@ def cmd_transpile(args):
         extra_args.append("--no-fuse-rope")
     if args.no_fuse_attention:
         extra_args.append("--no-fuse-attention")
+    if args.no_fuse_attention_block:
+        extra_args.append("--no-fuse-attention-block")
+    if args.no_fuse_add_clipped:
+        extra_args.append("--no-fuse-add-clipped")
+    if args.no_fuse_gated_deltanet:
+        extra_args.append("--no-fuse-gated-deltanet")
+    if args.npu:
+        extra_args.append("--npu")
+        if args.npu_quantize is not None:
+            extra_args.extend(["--npu-quantize", str(args.npu_quantize)])
+        if args.npu_audio_quantize is not None:
+            extra_args.extend(["--npu-audio-quantize", str(args.npu_audio_quantize)])
+        if args.npu_vision_quantize is not None:
+            extra_args.extend(["--npu-vision-quantize", str(args.npu_vision_quantize)])
 
     return run_transpile(
         args.model_id,
