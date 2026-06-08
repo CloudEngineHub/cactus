@@ -35,28 +35,7 @@ cp android/README.md site_docs/android/README.md
 cp bindings/flutter/README.md site_docs/flutter/README.md
 cp bindings/swift/README.md site_docs/swift/README.md
 cp bindings/kotlin/README.md site_docs/kotlin/README.md
-
-mkdir -p site_docs/react-native
-if curl -sfL "https://raw.githubusercontent.com/cactus-compute/cactus-react-native/main/README.md" -o site_docs/react-native/README.md; then
-
-  {
-    echo '!!! info "Independent release cycle"'
-    echo '    The React Native SDK releases independently from the Cactus engine.'
-    echo '    Check the [releases page](https://github.com/cactus-compute/cactus-react-native/releases) for the latest compatible version.'
-    echo ''
-    cat site_docs/react-native/README.md
-  } > site_docs/react-native/README.tmp && mv site_docs/react-native/README.tmp site_docs/react-native/README.md
- 
-  mkdir -p site_docs/react-native/assets
-  curl -sfL "https://raw.githubusercontent.com/cactus-compute/cactus-react-native/main/assets/logo.png" -o site_docs/react-native/assets/logo.png 2>/dev/null || true
-  echo "Fetched React Native README"
-else
-  echo "# React Native SDK" > site_docs/react-native/README.md
-  echo "" >> site_docs/react-native/README.md
-  echo "See [cactus-react-native on GitHub](https://github.com/cactus-compute/cactus-react-native) for full documentation." >> site_docs/react-native/README.md
-  echo "Warning: Could not fetch React Native README, using fallback"
-fi
-
+cp bindings/react-native/README.md site_docs/react-native/README.md
 cp bindings/rust/README.md site_docs/rust/README.md
 
 if [ -d blog ] && ls blog/*.md >/dev/null 2>&1; then
@@ -93,8 +72,6 @@ sedi 's|(/bindings/rust/)|(rust/README.md)|g' site_docs/index.md
 sedi 's|(/python/)|(python/README.md)|g' site_docs/index.md
 sedi 's|(/apple/)|(apple/README.md)|g' site_docs/index.md
 sedi 's|(/android/)|(android/README.md)|g' site_docs/index.md
-sedi 's|(/flutter/)|(flutter/README.md)|g' site_docs/index.md
-sedi 's|(/rust/)|(rust/README.md)|g' site_docs/index.md
 sedi 's|(/blog/hybrid_transcription\.md)|(blog/hybrid_transcription.md)|g' site_docs/index.md
 sedi 's|(/blog/lfm2_24b_a2b\.md)|(blog/lfm2_24b_a2b.md)|g' site_docs/index.md
 sedi 's|(/blog/parakeet\.md)|(blog/parakeet.md)|g' site_docs/index.md
@@ -127,8 +104,6 @@ for f in site_docs/docs/*.md; do
   sedi 's|(/python/)|(../python/README.md)|g' "$f"
   sedi 's|(/apple/)|(../apple/README.md)|g' "$f"
   sedi 's|(/android/)|(../android/README.md)|g' "$f"
-  sedi 's|(/flutter/)|(../flutter/README.md)|g' "$f"
-  sedi 's|(/rust/)|(../rust/README.md)|g' "$f"
 done
 
 for f in site_docs/python/README.md site_docs/apple/README.md site_docs/android/README.md site_docs/flutter/README.md site_docs/swift/README.md site_docs/kotlin/README.md; do
@@ -152,8 +127,6 @@ for f in site_docs/python/README.md site_docs/apple/README.md site_docs/android/
   sedi 's|(/python/)|(../python/README.md)|g' "$f"
   sedi 's|(/apple/)|(../apple/README.md)|g' "$f"
   sedi 's|(/android/)|(../android/README.md)|g' "$f"
-  sedi 's|(/flutter/)|(../flutter/README.md)|g' "$f"
-  sedi 's|(/rust/)|(../rust/README.md)|g' "$f"
   sedi 's|(\.\.\/README\.md)|(../index.md)|g' "$f"
 done
 
@@ -179,8 +152,6 @@ if [ -f site_docs/rust/README.md ]; then
     's|(/python/)|(../python/README.md)|g' \
     's|(/apple/)|(../apple/README.md)|g' \
     's|(/android/)|(../android/README.md)|g' \
-    's|(/flutter/)|(../flutter/README.md)|g' \
-    's|(/rust/)|(../rust/README.md)|g' \
     's|(\.\.\/README\.md)|(../index.md)|g'; do
     sedi "$pattern" site_docs/rust/README.md
   done
@@ -206,8 +177,6 @@ if ls site_docs/blog/*.md >/dev/null 2>&1; then
     sedi 's|(/python/)|(../python/README.md)|g' "$f"
     sedi 's|(/apple/)|(../apple/README.md)|g' "$f"
     sedi 's|(/android/)|(../android/README.md)|g' "$f"
-    sedi 's|(/flutter/)|(../flutter/README.md)|g' "$f"
-    sedi 's|(/rust/)|(../rust/README.md)|g' "$f"
     sedi 's|(/blog/hybrid_transcription\.md)|(hybrid_transcription.md)|g' "$f"
     sedi 's|(/blog/lfm2_24b_a2b\.md)|(lfm2_24b_a2b.md)|g' "$f"
     sedi 's|(/blog/parakeet\.md)|(parakeet.md)|g' "$f"

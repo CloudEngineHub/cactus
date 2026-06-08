@@ -126,16 +126,16 @@ Cactus supports React Native, Flutter, Swift, Kotlin, Python, Rust, and C++. Pic
 
 | Platform | Binding | Install |
 |---|---|---|
-| React Native | [cactus-react-native](https://github.com/cactus-compute/cactus-react-native) | `npm install cactus-react-native` |
+| React Native | [React Native bindings](https://cactus.dev/react-native/) | Native bridge over the C API |
 | Flutter | [cactus-flutter](https://cactus.dev/flutter/) | Dart FFI bindings |
 | Swift (iOS/macOS) | [cactus-swift](https://cactus.dev/swift/) | XCFramework with NPU support |
 | Kotlin (Android) | [cactus-kotlin](https://cactus.dev/kotlin/) | JNI + Kotlin Multiplatform |
-| Python | [cactus-ai](https://cactus.dev/python/) | `pip install cactus-ai` |
-| Rust | [cactus-sys](https://cactus.dev/rust/) | `cargo add cactus-sys` |
-| C++ | [cactus.h](https://cactus.dev/docs/cactus_engine/) | Single header, link `libcactus.a` |
+| Python | [cactus-compute](https://cactus.dev/python/) | `pip install cactus-compute` |
+| Rust | [Rust bindings](https://cactus.dev/rust/) | Copy `cactus.rs`, link `libcactus_engine.a` |
+| C++ | [cactus.h](https://cactus.dev/docs/cactus_engine/) | Single header, link `libcactus_engine.a` |
 
 Full quickstart with code examples for every binding: [cactus.dev/docs/quickstart](https://cactus.dev/docs/quickstart/)
 
-Pre-quantized weights for Gemma 4 and 30+ other models: [huggingface.co/cactus-compute](https://huggingface.co/cactus-compute)
+Pre-quantized weights for Gemma 4 and 30+ other models: [huggingface.co/Cactus-Compute](https://huggingface.co/Cactus-Compute)
 
 If you're building something with on-device multimodal AI (voice agents, VR interfaces, local-first apps) we want to hear about it. Open an issue on [GitHub](https://github.com/cactus-compute/cactus), or just start building.
