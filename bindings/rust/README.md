@@ -10,7 +10,7 @@ cactus build
 ```
 <!-- --8<-- [end:install] -->
 
-Copy [`cactus.rs`](cactus.rs) into your project (it carries its own `#[link]`
+Copy `cactus.rs` into your project (it carries its own `#[link]`
 attributes) and point Cargo at the build directory:
 
 ```rust

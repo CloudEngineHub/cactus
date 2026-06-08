@@ -6,17 +6,19 @@ on:
     paths:
       - docs/**
       - blog/**
+      - assets/**
       - mkdocs.yml
+      - CACTUS_VERSION
+      - CONTRIBUTING.md
+      - DCO.md
       - .github/assemble-docs.sh
       - .github/docs-overrides/**
       - .github/workflows/docs.yml
       - python/README.md
       - apple/README.md
       - android/README.md
-      - bindings/README.md
       - bindings/flutter/README.md
       - bindings/kotlin/README.md
-      - bindings/python/README.md
       - bindings/react-native/README.md
       - bindings/rust/README.md
       - bindings/swift/README.md
@@ -32,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: docs-${{ github.ref }}
+  group: docs-deploy
   cancel-in-progress: false
 
 jobs:
