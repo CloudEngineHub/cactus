@@ -1826,6 +1826,9 @@ bool Model::run_chunk_prefill_path(const std::vector<uint32_t>& tokens,
                 qwen_images.push_back(std::move(prep));
             } else {
                 Gemma4ImagePreprocessed prep = preprocess_gemma4_image(path, config_);
+                if (has_npu_vision_encoder() && vision_encode_via_npu(prep.pixel_values)) {
+                    continue;
+                }
                 int pv_idx = input_index(*vision_encoder_, "pixel_values");
                 if (pv_idx >= 0) {
                     auto& pv_buf = vision_encoder_->input_buffers[pv_idx];
