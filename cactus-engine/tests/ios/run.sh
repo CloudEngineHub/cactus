@@ -298,6 +298,7 @@ else
          SDKROOT="$ios_sdk_path" \
          PRODUCT_BUNDLE_IDENTIFIER="$bundle_id" \
          CODE_SIGN_STYLE="Automatic" \
+         CODE_SIGN_ENTITLEMENTS="$SCRIPT_DIR/CactusTest/CactusTest/CactusTest.entitlements" \
          build; then
         echo "Build failed"
         exit 1
