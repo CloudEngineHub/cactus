@@ -476,6 +476,8 @@ std::string Tokenizer::format_gemma4_style(const std::vector<ChatMessage>& messa
     }
 
     auto compute_soft_tokens = [&](const std::string& image_path) -> size_t {
+        if (image_soft_token_count_ > 0) return image_soft_token_count_;
+
         int w = 0, h = 0, c = 0;
         unsigned char* data = cactus_image_load(image_path.c_str(), &w, &h, &c, 3);
         if (!data) return 0;

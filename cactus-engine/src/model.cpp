@@ -510,6 +510,12 @@ bool Model::init(const std::string& bundle_dir, size_t context_size,
         std::string full_path = bundle_dir + "/" + npu_vision_encoder_mlpackage_;
         if (!load_npu_vision_encoder(full_path)) {
             CACTUS_LOG_WARN("model", "NPU vision encoder load failed for " << full_path << "; falling back to CPU");
+        } else if (tokenizer_) {
+            const auto& npu_out = npu_vision_encoder_->get_output_shape();
+            size_t npu_rows = 0;
+            if (npu_out.size() >= 3) npu_rows = static_cast<size_t>(npu_out[npu_out.size() - 2]);
+            else if (npu_out.size() >= 2) npu_rows = static_cast<size_t>(npu_out[0]);
+            if (npu_rows > 0) tokenizer_->set_image_soft_token_count(npu_rows);
         }
     }
     if (load_handoff_probe() && decoder_ && output_index(*decoder_, "probe_hidden") < 0) {
