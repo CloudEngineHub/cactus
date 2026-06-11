@@ -1,6 +1,7 @@
 #include "../cactus_engine.h"
 #include "cloud.h"
 #include "utils.h"
+#include "chat_tools.h"
 #include "telemetry.h"
 #include "cactus_kernels.h"
 #include "wav.h"
@@ -567,9 +568,14 @@ PreparedPrompt prepare_prompt(
         prompt.options.force_tools = true;
     }
 
+    // Build the tool-definition block in the format each model family was trained on.
     std::string formatted_tools;
     if (prompt.model_type == Config::ModelType::NEEDLE) {
         formatted_tools = serialize_needle_tools(prompt.tools);
+    } else if (tokenizer->is_qwen_family()) {
+        formatted_tools = chat_tools::serialize_tools_qwen(prompt.tools);
+    } else if (tokenizer->is_lfm2_family()) {
+        formatted_tools = chat_tools::serialize_tools_lfm2(prompt.tools);
     } else {
         formatted_tools = gemma::format_tools(prompt.tools, true);
     }

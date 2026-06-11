@@ -532,6 +532,7 @@ std::vector<cactus::ffi::ToolFunction> select_relevant_tools(
     size_t top_k);
 
 #include "gemma_tools.h"
+#include "chat_tools.h"
 
 namespace cactus {
 namespace ffi {
@@ -1504,8 +1505,13 @@ inline void parse_function_calls_from_response(const std::string& response_text,
     const std::string needle_marker = "<tool_call>";
     size_t needle_pos = regular_response.find(needle_marker);
     if (needle_pos != std::string::npos) {
-        size_t array_start = regular_response.find('[', needle_pos + needle_marker.size());
-        if (array_start != std::string::npos) {
+        size_t scan = needle_pos + needle_marker.size();
+        while (scan < regular_response.size() &&
+               std::isspace(static_cast<unsigned char>(regular_response[scan]))) {
+            ++scan;
+        }
+        if (scan < regular_response.size() && regular_response[scan] == '[') {
+            size_t array_start = scan;
             size_t array_end = find_matching_delimiter(regular_response, array_start, '[', ']');
             if (array_end <= regular_response.size()) {
                 size_t pos = array_start + 1;
@@ -1525,6 +1531,8 @@ inline void parse_function_calls_from_response(const std::string& response_text,
     }
 
     gemma::parse_function_calls(regular_response, function_calls);
+    chat_tools::extract_qwen_tool_calls(regular_response, function_calls);
+    chat_tools::extract_lfm2_tool_calls(regular_response, function_calls);
 
     const char* FUNCTION_CALL_MARKER = "\"function_call\"";
     size_t search_pos = 0;

@@ -2954,8 +2954,6 @@ std::vector<float> Model::get_audio_embeddings(const std::vector<float>& mel_bin
         media_feature_shapes_.erase(name);
         media_feature_precisions_.erase(name);
     }
-    // run_audio_encoder_messages unloads the graph; restore so subsequent
-    // transcribe_* paths (which assume the encoder stays loaded) work.
     load_component_graph(*audio_encoder_);
     return embedding;
 }
@@ -2992,8 +2990,6 @@ std::vector<size_t> Model::compressible_layers() const {
         config_.layer_types, config_.num_layers, shared);
 }
 
-// Keep params.abs_budget survivors per (layer, kv-head) -- sink + recent + most distinctive middle
-// tokens by KeyDiff -- compact them, and renumber RoPE positions to a contiguous window 0..B-1.
 void Model::compress_kv_cache_keydiff(const cactus::kvcompress::Params& params) {
     if (!decoder_) return;
     using cactus::kvcompress::CacheHeader;
@@ -3037,23 +3033,17 @@ void Model::compress_kv_cache_keydiff(const cactus::kvcompress::Params& params) 
         if (per_head_protect && protect_budget > 0 &&
             special_rows_.max_reserved(li, params.sink, appended_special) > protect_budget) return;
     }
-    // B is identical across the compacted layers; capture it from the keep-set, not a mutated header.
     size_t new_seq_len = 0;
     bool have_new_seq_len = false;
     std::vector<int> canonical_keep;
     bool canonical_captured = false;
-    // The un-rope table is identical across compressible layers (all global, same theta/dims), so
-    // build it once on the first such layer and reuse it for every layer's keep-set scoring.
     std::vector<cactus::kvcompress::RopeRotation> unrope;
-    // Reclaim capacity a long prefill grew into; next_pow2(trigger) still fits the decode oscillation.
     size_t shrink_cap = 1;
     while (shrink_cap < static_cast<size_t>(config_.kv_compress_trigger_len)) shrink_cap <<= 1;
     for (size_t li = 0; li < comp.cache_states.size(); ++li) {
         if (!compressible.count(li)) continue;
         const auto& cs = comp.cache_states[li];
         if (cs.key_node_id < 0 || cs.value_node_id < 0) continue;
-        // Skip non-KV caches: hybrid models (LFM2) interleave header-less conv/recurrent states
-        // here, which KeyDiff would corrupt and read out of bounds.
         if (comp.graph->get_node_op_type(static_cast<size_t>(cs.key_node_id)) != OpType::KV_CACHE_STATE) continue;
 
         const auto& kdesc = comp.graph->get_output_buffer(static_cast<size_t>(cs.key_node_id));
@@ -3114,8 +3104,6 @@ void Model::compress_kv_cache_keydiff(const cactus::kvcompress::Params& params) 
         comp.graph->shrink_cache_buffer(static_cast<size_t>(cs.value_node_id), shrink_cap);
     }
 
-    // Shift non-compacted layers' recent K rows by -Δ into the compressed frame (RoPE is relative, so a
-    // uniform shift preserves q·k offsets); each uses its own theta -- local for sliding, global for shared sources.
     const size_t Delta = (have_new_seq_len && old_total >= new_seq_len) ? old_total - new_seq_len : 0;
     if (Delta > 0) {
         const double dpos = -static_cast<double>(Delta);
@@ -3150,7 +3138,6 @@ void Model::compress_kv_cache_keydiff(const cactus::kvcompress::Params& params) 
         }
     }
 
-    // All layers now share the same compressed frame, so the next decode query uses position_ids = B.
     if (have_new_seq_len) {
         cache_total_seq_len_ = new_seq_len;
         if (per_head_protect) special_rows_.set_tracked_len(new_seq_len);
@@ -3191,8 +3178,6 @@ std::vector<float> Model::get_embeddings(const std::vector<uint32_t>& tokens, bo
         throw std::runtime_error("get_embeddings: failed to load embedding component graph");
     }
 
-    // Embedding encoders (nomic / XLM-R) wrap the sequence with BOS/EOS, matching
-    // the reference tokenizer's add_special_tokens behavior.
     std::vector<uint32_t> wrapped;
     wrapped.reserve(tokens.size() + 2);
     if (tokenizer_) wrapped.push_back(tokenizer_->get_bos_token());
