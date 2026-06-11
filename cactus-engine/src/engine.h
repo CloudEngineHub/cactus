@@ -42,6 +42,8 @@ public:
     virtual bool is_available() const = 0;
     virtual std::vector<int> get_input_shape() const = 0;
     virtual std::vector<int> get_output_shape() const = 0;
+    virtual bool has_input(const std::string&) const { return false; }
+    virtual std::vector<int> get_input_shape_for(const std::string&) const { return {}; }
     virtual __fp16* get_output_buffer() = 0;
     virtual size_t get_output_buffer_size() const = 0;
     virtual size_t encode_multimodal_input(
@@ -837,7 +839,8 @@ private:
     std::unique_ptr<npu::NPUEncoder> npu_source_encoder_;
 
     bool audio_encode_via_npu(const std::vector<float>& audio_features);
-    bool vision_encode_via_npu(const std::vector<float>& pixel_values);
+    bool vision_encode_via_npu(const std::vector<float>& pixel_values,
+                               const std::vector<int64_t>* pixel_position_ids = nullptr);
     bool source_encode_via_npu(const std::vector<uint32_t>& tokens);
 
     std::map<std::string, std::vector<uint8_t>> media_features_;
