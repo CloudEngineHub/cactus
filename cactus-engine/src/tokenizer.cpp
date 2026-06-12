@@ -574,11 +574,32 @@ std::string Tokenizer::format_lfm2_style(const std::vector<ChatMessage>& message
 
         result += "<|im_start|>" + role + "\n";
         if (role == "user") {
-            const size_t soft_n = image_soft_token_count_ > 0 ? image_soft_token_count_ : 1;
             for (const auto& image_path : msg.images) {
-                (void)image_path;
+                int iw = 0, ih = 0, ic = 0;
+                Lfm2VlTokenLayout layout;
+                if (has_lfm2_vision_config_ && cactus_image_info(image_path.c_str(), &iw, &ih, &ic)) {
+                    layout = lfm2_vl_token_layout(ih, iw, lfm2_vision_config_);
+                } else {
+                    layout.grid_rows = 1;
+                    layout.grid_cols = 1;
+                    layout.tokens_per_tile = image_soft_token_count_ > 0 ? static_cast<int>(image_soft_token_count_) : 1;
+                }
                 result += "<|image_start|>";
-                for (size_t k = 0; k < soft_n; ++k) result += "<image>";
+                const bool multi_tile = layout.grid_rows > 1 || layout.grid_cols > 1;
+                if (multi_tile) {
+                    for (int r = 0; r < layout.grid_rows; ++r) {
+                        for (int c = 0; c < layout.grid_cols; ++c) {
+                            result += "<|img_row_" + std::to_string(r + 1) + "_col_" + std::to_string(c + 1) + "|>";
+                            for (int k = 0; k < layout.tokens_per_tile; ++k) result += "<image>";
+                        }
+                    }
+                    if (layout.has_thumbnail) {
+                        result += "<|img_thumbnail|>";
+                        for (int k = 0; k < layout.thumbnail_tokens; ++k) result += "<image>";
+                    }
+                } else {
+                    for (int k = 0; k < layout.tokens_per_tile; ++k) result += "<image>";
+                }
                 result += "<|image_end|>\n";
             }
         }

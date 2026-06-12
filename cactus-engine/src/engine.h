@@ -348,6 +348,8 @@ public:
     void set_image_soft_token_count(size_t n) { image_soft_token_count_ = n; }
     size_t get_image_soft_token_count() const { return image_soft_token_count_; }
 
+    void set_lfm2_vision_config(const Config& cfg) { lfm2_vision_config_ = cfg; has_lfm2_vision_config_ = true; }
+
 protected:
     enum class ModelType { UNKNOWN, GEMMA4, GEMMA, QWEN, LFM2, NEEDLE };
     ModelType model_type_ = ModelType::UNKNOWN;
@@ -366,6 +368,8 @@ protected:
     uint32_t vision_default_output_length_ = 280;
     uint32_t vision_image_size_ = 768;
     size_t image_soft_token_count_ = 0;
+    Config lfm2_vision_config_{};
+    bool has_lfm2_vision_config_ = false;
     TokenizerRuntimeConfig runtime_config_;
 
     void detect_model_type(const std::string& config_path);
@@ -804,6 +808,12 @@ private:
     bool load_handoff_probe();
     void maybe_capture_handoff_probe_hidden(const Component& comp);
     void run_vision_encoder(const std::string& image_path);
+    void run_vision_encoder_lfm2_vl(const std::string& image_path);
+    void encode_lfm2_vl_image_into_features(const std::string& image_path);
+    bool load_lfm2_vl_position_grid();
+    bool lfm2_vl_use_npu_vision() const;
+    bool lfm2_vl_encode_tile_npu(const float* pixel_values, const int64_t* mask, const float* pos_embeds,
+                                 size_t max_patches, int dim, size_t patch_dim, std::vector<float>& enc_out);
     void run_audio_encoder(const std::vector<float>& audio_features);
     void run_audio_encoder_messages(const std::vector<std::vector<float>>& audio_features_per_message);
     bool run_chunk_prefill_path(const std::vector<uint32_t>& tokens,
@@ -827,6 +837,7 @@ private:
     Component* source_encoder_ = nullptr;
     Component* decoder_cross_kv_ = nullptr;
     Component* vision_encoder_ = nullptr;
+    Component* vision_projector_ = nullptr;
     Component* audio_encoder_ = nullptr;
     Component* lm_encoder_media_step_ = nullptr;
     Component* decoder_prefill_chunk_ = nullptr;
@@ -855,6 +866,12 @@ private:
     std::map<std::string, std::vector<uint8_t>> media_features_;
     std::map<std::string, std::vector<size_t>> media_feature_shapes_;
     std::map<std::string, Precision> media_feature_precisions_;
+
+    std::vector<float> lfm2_pos_grid_;
+    int lfm2_pos_grid_h_ = 0;
+    int lfm2_pos_grid_w_ = 0;
+    int lfm2_pos_grid_dim_ = 0;
+    bool lfm2_pos_grid_loaded_ = false;
 
     Config config_;
     std::unique_ptr<Tokenizer> tokenizer_;
@@ -1028,13 +1045,27 @@ Gemma4ImagePreprocessed preprocess_gemma4_image(const std::string& image_path, c
 struct Lfm2VlImagePreprocessed {
     std::vector<float> pixel_values;
     std::vector<int64_t> pixel_attention_mask;
-    std::pair<int, int> spatial_shape{0, 0};
-    size_t num_patches = 0;
-    size_t patch_dim = 0;
+    std::vector<std::pair<int, int>> spatial_shapes;
     size_t max_num_patches = 0;
+    size_t patch_dim = 0;
 };
 
 Lfm2VlImagePreprocessed preprocess_lfm2_vl_image(const std::string& image_path, const Config& config);
+
+void interpolate_position_embeddings(const float* grid, int grid_h, int grid_w, int dim,
+                                             int out_h, int out_w, float* out);
+
+void pixel_unshuffle(const float* feature, int h, int w, int dim, int factor, float* out);
+
+struct Lfm2VlTokenLayout {
+    int grid_rows = 1;
+    int grid_cols = 1;
+    int tokens_per_tile = 0;
+    int thumbnail_tokens = 0;
+    bool has_thumbnail = false;
+};
+
+Lfm2VlTokenLayout lfm2_vl_token_layout(int image_height, int image_width, const Config& config);
 
 struct Qwen3VlImagePreprocessed {
     std::vector<float> pixel_values;
