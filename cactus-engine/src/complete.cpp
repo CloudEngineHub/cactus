@@ -1356,9 +1356,12 @@ int cactus_benchmark_tokens(
         sample_peak_ram();
         auto first_token_time = std::chrono::high_resolution_clock::now();
 
+        std::vector<uint32_t> completion_tokens;
+        if (decode_token_len > 0) completion_tokens.push_back(next_token);
         size_t generated = decode_token_len > 0 ? 1 : 0;
         while (generated < decode_token_len) {
             next_token = handle->model->decode({next_token}, 0.0f, 1.0f, 1);
+            completion_tokens.push_back(next_token);
             sample_peak_ram();
             ++generated;
         }
@@ -1397,9 +1400,17 @@ int cactus_benchmark_tokens(
             << "\"first_token_from_prefill\":" << (first_token_from_prefill ? "true" : "false") << ","
             << "\"prefill_padding_tokens\":" << handle->model->last_prefill_padding_tokens() << ","
             << "\"prefill_scalar_tail_tokens\":" << handle->model->last_prefill_scalar_tail_tokens() << ","
+            << "\"prefill_tail_chunk_tokens\":" << handle->model->last_prefill_tail_chunk_tokens() << ","
+            << "\"prefill_tail_padding_tokens\":" << handle->model->last_prefill_tail_padding_tokens() << ","
             << "\"decode_tps\":" << std::fixed << std::setprecision(2) << decode_tps << ","
             << "\"prompt_tokens\":" << prompt_token_len << ","
             << "\"completion_tokens\":" << generated << ","
+            << "\"completion_token_ids\":[";
+        for (size_t i = 0; i < completion_tokens.size(); ++i) {
+            if (i) oss << ",";
+            oss << completion_tokens[i];
+        }
+        oss << "],"
             << "\"peak_ram_usage_mb\":" << std::fixed << std::setprecision(2) << peak_ram_usage_mb << ","
             << "\"ram_usage_mb\":" << std::fixed << std::setprecision(2) << get_ram_usage_mb()
             << "}";

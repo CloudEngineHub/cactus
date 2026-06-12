@@ -556,12 +556,17 @@ bool Model::init(const std::string& bundle_dir, size_t context_size,
     if (components_.count("decoder_prefill_chunk") && components_.at("decoder_prefill_chunk").graph) {
         decoder_prefill_ = &components_.at("decoder_prefill_chunk");
         decoder_prefill_chunk_ = decoder_prefill_;
+    } else if (decode_route_ != DecodeRoute::ENCODER_CROSS_KV_STEP && !components_.count("audio_encoder")) {
+        CACTUS_LOG_WARN("model", "Bundle has no decoder_prefill_chunk component; prompts will prefill token-by-token (prefill speed ~= decode speed).");
     }
     if (components_.count("decoder_embed_chunk") && components_.at("decoder_embed_chunk").graph) {
         decoder_embed_ = &components_.at("decoder_embed_chunk");
     }
     if (components_.count("lm_encoder_text_chunk") && components_.at("lm_encoder_text_chunk").graph) {
         prefill_encoder_ = &components_.at("lm_encoder_text_chunk");
+    }
+    if (const char* env = std::getenv("CACTUS_DISABLE_PREFILL_TAIL_PAD")) {
+        prefill_tail_pad_disabled_ = std::atoi(env) != 0;
     }
     vision_encoder_ = components_.count("vision_encoder") ? &components_.at("vision_encoder") : nullptr;
     audio_encoder_ = components_.count("audio_encoder") ? &components_.at("audio_encoder") : nullptr;
@@ -1059,11 +1064,48 @@ size_t Model::component_output_tokens(const Component& comp, const std::string& 
     return 0;
 }
 
-Model::ChunkedPrefillResult Model::run_chunked_prefill(const std::vector<uint32_t>& tokens, size_t start_position, size_t chunk_size, bool prepare_decode) {
-    ChunkedPrefillResult result;
+void Model::execute_prefill_chunk(Component& chunk_comp, Component* enc_comp, size_t encoder_chunk,
+                                  size_t chunk_tokens, const std::vector<uint32_t>& tokens,
+                                  size_t processed, size_t start_position) {
+    for (size_t i = 0; i < chunk_comp.input_buffers.size(); ++i) {
+        std::fill(chunk_comp.input_buffers[i].begin(), chunk_comp.input_buffers[i].end(), 0);
+    }
+    if (enc_comp && encoder_chunk > 0) {
+        for (size_t chunk_offset = 0; chunk_offset < chunk_tokens; chunk_offset += encoder_chunk) {
+            for (size_t i = 0; i < enc_comp->input_buffers.size(); ++i) {
+                std::fill(enc_comp->input_buffers[i].begin(), enc_comp->input_buffers[i].end(), 0);
+            }
+            for (size_t i = 0; i < encoder_chunk; ++i) {
+                size_t index = processed + chunk_offset + i;
+                uint32_t token = index < tokens.size() ? tokens[index] : static_cast<uint32_t>(config_.pad_token_id);
+                write_int_input_at(*enc_comp, "input_ids", i, static_cast<int64_t>(token));
+                write_int_input_at(*enc_comp, "position_ids", i, static_cast<int64_t>(start_position + processed + chunk_offset + i));
+            }
+            enc_comp->graph->execute();
+            copy_component_outputs_to_chunk_inputs_range(*enc_comp, chunk_comp, chunk_offset);
+        }
+    } else {
+        for (size_t i = 0; i < chunk_tokens; ++i) {
+            size_t index = processed + i;
+            uint32_t token = index < tokens.size() ? tokens[index] : static_cast<uint32_t>(config_.pad_token_id);
+            run_encoder_step(token, start_position + processed + i);
+            copy_component_outputs_to_chunk_inputs(*encoder_, chunk_comp, i);
+        }
+    }
+    chunk_comp.graph->execute();
+}
+
+void Model::reset_prefill_stats() {
     last_prefill_cache_copy_ms_ = 0.0;
     last_prefill_padding_tokens_ = 0;
     last_prefill_scalar_tail_tokens_ = 0;
+    last_prefill_tail_chunk_tokens_ = 0;
+    last_prefill_tail_padding_tokens_ = 0;
+}
+
+Model::ChunkedPrefillResult Model::run_chunked_prefill(const std::vector<uint32_t>& tokens, size_t start_position, size_t chunk_size, bool prepare_decode) {
+    ChunkedPrefillResult result;
+    reset_prefill_stats();
     if (decode_route_ != DecodeRoute::CACHED_STEP || !encoder_ || !decoder_ || !decoder_prefill_) return result;
     if (start_position != 0) return result;
     if (!load_component_graph(*decoder_prefill_)) return result;
@@ -1096,20 +1138,28 @@ Model::ChunkedPrefillResult Model::run_chunked_prefill(const std::vector<uint32_
     });
     const size_t tail_tokens = tokens.size() - whole_chunks_end;
     const size_t padding_cutoff = std::max<size_t>(1, effective_chunk / 16);
-    const bool pad_tail = family_ != "lfm2_vl"
+    const bool has_conv_state = any_cache_node([&](size_t id) {
+        return decoder_prefill_->graph->get_node_op_type(id) == OpType::CONV_CACHE_STATE;
+    });
+    const bool pad_tail = !has_conv_state
         && !has_recurrent_state
         && !has_sliding_window_cache
         && tail_tokens >= padding_cutoff;
+    const bool padded_window_too_small = any_cache_node([&](size_t id) {
+        if (decoder_prefill_->graph->get_node_op_type(id) != OpType::KV_CACHE_STATE) return false;
+        size_t window = decoder_prefill_->graph->get_node_window_size(id);
+        size_t sink = decoder_prefill_->graph->get_node_sink_size(id);
+        return window > 0 && (window < effective_chunk * 4 || window <= effective_chunk + sink);
+    });
+    const bool use_padded_tail = !pad_tail && !prefill_tail_pad_disabled_
+        && has_sliding_window_cache && !has_recurrent_state && !has_conv_state
+        && tail_tokens > 8 && !padded_window_too_small;
     const size_t executable_tokens = whole_chunks_end + (pad_tail ? effective_chunk : 0);
-    if (executable_tokens == 0) {
+    if (executable_tokens == 0 && !use_padded_tail) {
         result.scalar_tail_tokens = tail_tokens;
         last_prefill_scalar_tail_tokens_ = tail_tokens;
         return result;
     }
-    result.padding_tokens = executable_tokens > tokens.size() ? executable_tokens - tokens.size() : 0;
-    result.scalar_tail_tokens = tokens.size() - std::min(tokens.size(), executable_tokens);
-    last_prefill_padding_tokens_ = result.padding_tokens;
-    last_prefill_scalar_tail_tokens_ = result.scalar_tail_tokens;
 
     size_t encoder_chunk = 0;
     if (prefill_encoder_ && input_index(*prefill_encoder_, "input_ids") >= 0 && input_index(*prefill_encoder_, "position_ids") >= 0) {
@@ -1121,39 +1171,47 @@ Model::ChunkedPrefillResult Model::run_chunked_prefill(const std::vector<uint32_
 
     size_t processed = 0;
     while (processed + effective_chunk <= executable_tokens) {
-        for (size_t i = 0; i < decoder_prefill_->input_buffers.size(); ++i) {
-            std::fill(decoder_prefill_->input_buffers[i].begin(), decoder_prefill_->input_buffers[i].end(), 0);
-        }
-        if (encoder_chunk > 0) {
-            for (size_t chunk_offset = 0; chunk_offset < effective_chunk; chunk_offset += encoder_chunk) {
-                for (size_t i = 0; i < prefill_encoder_->input_buffers.size(); ++i) {
-                    std::fill(prefill_encoder_->input_buffers[i].begin(), prefill_encoder_->input_buffers[i].end(), 0);
-                }
-                for (size_t i = 0; i < encoder_chunk; ++i) {
-                    size_t index = processed + chunk_offset + i;
-                    uint32_t token = index < tokens.size() ? tokens[index] : static_cast<uint32_t>(config_.pad_token_id);
-                    write_int_input_at(*prefill_encoder_, "input_ids", i, static_cast<int64_t>(token));
-                    write_int_input_at(*prefill_encoder_, "position_ids", i, static_cast<int64_t>(start_position + processed + chunk_offset + i));
-                }
-                prefill_encoder_->graph->execute();
-                copy_component_outputs_to_chunk_inputs_range(*prefill_encoder_, *decoder_prefill_, chunk_offset);
-            }
-        } else {
-            for (size_t i = 0; i < effective_chunk; ++i) {
-                size_t index = processed + i;
-                uint32_t token = index < tokens.size() ? tokens[index] : static_cast<uint32_t>(config_.pad_token_id);
-                run_encoder_step(token, start_position + processed + i);
-                copy_component_outputs_to_chunk_inputs(*encoder_, *decoder_prefill_, i);
-            }
-        }
-        decoder_prefill_->graph->execute();
+        execute_prefill_chunk(*decoder_prefill_, prefill_encoder_, encoder_chunk,
+                              effective_chunk, tokens, processed, start_position);
         processed += effective_chunk;
     }
+
+    size_t tail_executed = 0;
+    size_t tail_padding = 0;
+    if (use_padded_tail) {
+        const size_t pads = effective_chunk - tail_tokens;
+        const size_t kept_real = tail_tokens - 1;
+        std::vector<std::pair<size_t, std::vector<uint8_t>>> backups;
+        for (const auto& state : decoder_prefill_->cache_states) {
+            for (int node_id : {state.key_node_id, state.value_node_id}) {
+                if (node_id < 0) continue;
+                size_t id = static_cast<size_t>(node_id);
+                if (decoder_prefill_->graph->get_node_op_type(id) != OpType::KV_CACHE_STATE) continue;
+                backups.emplace_back(id, decoder_prefill_->graph->snapshot_cache_padded_append(id, kept_real, pads + 1));
+            }
+        }
+        execute_prefill_chunk(*decoder_prefill_, prefill_encoder_, encoder_chunk,
+                              effective_chunk, tokens, processed, start_position);
+        for (auto& [id, backup] : backups) {
+            decoder_prefill_->graph->rollback_cache_padded_append(id, kept_real, pads + 1, backup);
+        }
+        processed += kept_real;
+        tail_executed = kept_real;
+        tail_padding = pads;
+    }
+
     result.executed_tokens = processed;
     result.logical_tokens = std::min(tokens.size(), processed);
     if (result.logical_tokens > 0) {
         result.last_logit_row = (result.logical_tokens - 1) % effective_chunk;
     }
+    result.padding_tokens = processed > tokens.size() ? processed - tokens.size() : 0;
+    result.scalar_tail_tokens = tokens.size() - result.logical_tokens;
+    last_prefill_padding_tokens_ = result.padding_tokens;
+    last_prefill_scalar_tail_tokens_ = result.scalar_tail_tokens;
+    last_prefill_tail_chunk_tokens_ = tail_executed;
+    last_prefill_tail_padding_tokens_ = tail_padding;
+
     if (processed > 0 && prepare_decode) {
         for (size_t i = 0; i < decoder_->input_buffers.size(); ++i) {
             std::fill(decoder_->input_buffers[i].begin(), decoder_->input_buffers[i].end(), 0);
@@ -1531,9 +1589,7 @@ uint32_t Model::argmax_last_logits(float* out_uncertainty) {
 }
 
 bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, uint32_t& out_token) {
-    last_prefill_cache_copy_ms_ = 0.0;
-    last_prefill_padding_tokens_ = 0;
-    last_prefill_scalar_tail_tokens_ = 0;
+    reset_prefill_stats();
     if (tokens.empty() || !decoder_ || cache_total_seq_len_ != 0) {
         return false;
     }
@@ -1610,9 +1666,7 @@ bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, 
 }
 
 void Model::prefill(const std::vector<uint32_t>& tokens, size_t /*chunk_size*/, const std::string& /*profile_file*/, bool prepare_decode) {
-    last_prefill_cache_copy_ms_ = 0.0;
-    last_prefill_padding_tokens_ = 0;
-    last_prefill_scalar_tail_tokens_ = 0;
+    reset_prefill_stats();
     if (decode_route_ == DecodeRoute::ENCODER_CROSS_KV_STEP && encoder_cross_kv_source_kind_ == "text_tokens") {
         (void)prepare_decode;
         prepare_encoder_cross_kv_from_text(tokens);
@@ -3465,7 +3519,7 @@ bool Config::from_json(const std::string& config_path) {
             std::transform(mt.begin(), mt.end(), mt.begin(), ::tolower);
             if (mt == "qwen") model_type = ModelType::QWEN;
             else if (mt == "qwen3p5" || mt == "qwen3_5") model_type = ModelType::QWEN3P5;
-            else if (mt == "gemma") model_type = ModelType::GEMMA;
+            else if (mt == "gemma" || mt == "gemma3") model_type = ModelType::GEMMA;
             else if (mt == "gemma3n") model_type = ModelType::GEMMA3N;
             else if (mt == "lfm2") model_type = ModelType::LFM2;
             else if (mt == "whisper") model_type = ModelType::WHISPER;
