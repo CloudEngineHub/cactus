@@ -5,6 +5,8 @@ from .. import __version__
 from .common import (
     DEFAULT_MODEL_ID,
     DEFAULT_TRANSCRIPTION_MODEL_ID,
+    DEFAULT_TEST_MODEL_ID,
+    DEFAULT_TEST_TRANSCRIPTION_MODEL_ID,
     SUPPORTED_PLATFORMS,
 )
 from .download import cmd_download
@@ -165,8 +167,8 @@ def create_parser():
   cactus test                          run the test suite
     --component <name>                 kernels | graph | engine | all
                                        (default: all)
-    --model <hf-id>                    default: {DEFAULT_MODEL_ID}
-    --transcription-model <hf-id>      default: {DEFAULT_TRANSCRIPTION_MODEL_ID}
+    --model <hf-id>                    default: {DEFAULT_TEST_MODEL_ID}
+    --transcription-model <hf-id>      default: {DEFAULT_TEST_TRANSCRIPTION_MODEL_ID}
     --suite <name>                     run a single test suite from any
                                        component (kernels, graph, or engine)
     --list                             list components and suites
@@ -278,10 +280,10 @@ def create_parser():
                              help="Component to test (default: all)")
     test_parser.add_argument("--model", dest="model_id", default=None,
                              type=_hf_id_or_path,
-                             help=f"HF model ID under test (default: {DEFAULT_MODEL_ID})")
+                             help=f"HF model ID under test (default: {DEFAULT_TEST_MODEL_ID})")
     test_parser.add_argument("--transcription-model", dest="transcription_model_id", default=None,
                              type=_hf_id_or_path,
-                             help=f"HF transcription model ID under test (default: {DEFAULT_TRANSCRIPTION_MODEL_ID})")
+                             help=f"HF transcription model ID under test (default: {DEFAULT_TEST_TRANSCRIPTION_MODEL_ID})")
     test_parser.add_argument("--suite", default=None,
                              help="Run a single test suite by name; resolved across all components (e.g. llm → engine, performance → kernels + graph)")
     test_parser.add_argument("--list", action="store_true",
