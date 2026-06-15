@@ -11,9 +11,10 @@ from .common import (
 )
 from .download import cmd_download
 
-_PLATFORM_CHOICES = ("cpu", *SUPPORTED_PLATFORMS)
+_PLATFORM_CHOICES = ("auto", "cpu", *SUPPORTED_PLATFORMS)
 _PLATFORM_HELP = (
-    f"target accelerator: cpu = generic ARM (default); "
+    f"target accelerator: auto = best for this host, e.g. apple on macOS (default); "
+    f"cpu = generic ARM; "
     f"or one of: {', '.join(SUPPORTED_PLATFORMS) if SUPPORTED_PLATFORMS else '(none yet)'}"
 )
 _PLATFORM_PIPE = "|".join(_PLATFORM_CHOICES)
@@ -95,7 +96,7 @@ def create_parser():
 
   cactus run [model|path]              run a model (default: {DEFAULT_MODEL_ID})
     --bits 1|2|3|4                     CQ quantization (default: 4)
-    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: cpu)
+    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
     --image <path>                     image file for VLM inference
     --audio <path>                     audio file for audio chat
     --system <prompt>                  system prompt
@@ -112,7 +113,7 @@ def create_parser():
 
   cactus download [model]              download a pre-built bundle (default: {DEFAULT_MODEL_ID})
     --bits 1|2|3|4                     CQ quantization (default: 4)
-    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: cpu)
+    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
     --token <token>                    HuggingFace token
 
   cactus convert <model> [dir]         convert HuggingFace weights to CQ
@@ -201,7 +202,7 @@ def create_parser():
                                  help=f"HuggingFace model id (default: {DEFAULT_MODEL_ID})")
     download_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
                                  help="CQ quantization bits (default: 4)")
-    download_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="cpu",
+    download_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
                                  help=_PLATFORM_HELP)
     download_parser.add_argument("--token", help="HuggingFace token")
 
@@ -221,7 +222,7 @@ def create_parser():
                             help=f"HuggingFace model id or local bundle path (default: {DEFAULT_MODEL_ID})")
     run_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
                             help="CQ quantization bits (default: 4)")
-    run_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="cpu",
+    run_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
                             help=_PLATFORM_HELP)
     run_parser.add_argument("--token", help="HuggingFace token")
     run_parser.add_argument("--reconvert", action="store_true",
