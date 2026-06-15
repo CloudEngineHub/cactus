@@ -532,12 +532,20 @@ int main(int argc, char** argv) {
         return rc < 0 ? 1 : 0;
     }
 
-    std::cout << "Model loaded.\n";
-    std::cout << "Commands: /image <path> [prompt], /audio <path> [prompt], ";
+    std::cout << "Model loaded.\n\n";
+    std::cout << "Commands:\n";
+    auto print_command = [](const char* command, const char* description) {
+        std::cout << "  " << std::left << std::setw(24) << command << description << "\n";
+    };
+    print_command("/image <path> [prompt]", "attach an image and chat about it");
+    print_command("/audio <path> [prompt]", "attach an audio file as a spoken prompt");
 #ifdef HAVE_SDL2
-    std::cout << "/record [prompt], ";
+    print_command("/record [prompt]", "record from the mic as a spoken prompt");
 #endif
-    std::cout << "/clear, reset, exit\n\n";
+    print_command("/clear", "drop the attached image/audio");
+    print_command("reset", "start a new conversation");
+    print_command("exit", "quit");
+    std::cout << std::right << "\n";
 
     std::vector<std::pair<std::string, std::string>> history;
     std::vector<uint8_t> current_pcm;
@@ -617,7 +625,7 @@ int main(int argc, char** argv) {
                 std::cerr << "Recording failed.\n";
                 continue;
             }
-            input = record_prompt.empty() ? "Transcribe or respond to this audio." : record_prompt;
+            input = record_prompt.empty() ? "Respond to the spoken request in this audio." : record_prompt;
 #else
             std::cerr << "Recording requires SDL2, but this binary was built without SDL2.\n";
             continue;
