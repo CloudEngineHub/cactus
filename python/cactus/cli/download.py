@@ -51,6 +51,7 @@ def download_bundle(model_id: str, *, bits: int = 4, platform: str | None = None
         download_cq_archive,
         list_hf_cq_archives,
         resolve_archive,
+        resolve_weight_revision,
         suggested_cq_repo,
         variant_suffix,
     )
@@ -59,16 +60,17 @@ def download_bundle(model_id: str, *, bits: int = 4, platform: str | None = None
     local_name = get_model_dir_name(model_id)
     bundle_dir = Path(output_dir) if output_dir else get_bundle_dir(model_id, bits=bits, platform=platform)
 
+    revision = resolve_weight_revision(repo_id, token=token)
     label = variant_suffix(bits, platform)
     print()
-    print_color(BLUE, f"Fetching {repo_id} [{label}]")
+    print_color(BLUE, f"Fetching {repo_id} [{label}] @ {revision or 'main'}")
 
-    archives = list_hf_cq_archives(repo_id, token=token)
+    archives = list_hf_cq_archives(repo_id, token=token, revision=revision)
     if not archives:
         raise RuntimeError(f"no bundles published at {repo_id}")
 
     resolution = resolve_archive(repo_id, local_name, archives, bits, platform=platform)
-    download_cq_archive(resolution, bundle_dir, token=token, reconvert=reconvert)
+    download_cq_archive(resolution, bundle_dir, token=token, revision=revision, reconvert=reconvert)
     print_color(GREEN, f"Ready at {bundle_dir}")
     return bundle_dir
 
