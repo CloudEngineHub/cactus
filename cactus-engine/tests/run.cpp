@@ -465,7 +465,8 @@ struct TokenPrinter {
 
     void print_stats(double ram_mb, double confidence, bool cloud_handoff, double threshold,
                      int reported_tokens = -1, double reported_decode_tps = -1.0,
-                     double reported_ttft_ms = -1.0, double reported_total_ms = -1.0) const {
+                     double reported_ttft_ms = -1.0, double reported_total_ms = -1.0,
+                     const std::string& cloud_reason = "") const {
         auto end = std::chrono::steady_clock::now();
         double total_s = std::chrono::duration<double>(end - start).count();
         double ttft_s = saw_first ? std::chrono::duration<double>(first - start).count() : 0.0;
@@ -490,6 +491,9 @@ struct TokenPrinter {
             std::cout << " | threshold: " << std::max(0.0, std::min(100.0, threshold * 100.0)) << "%";
         }
         std::cout << " | cloud: " << (cloud_handoff ? "yes" : "no");
+        if (!cloud_reason.empty()) {
+            std::cout << " (" << cloud_reason << ")";
+        }
         if (ram_mb > 0.0) {
             std::cout << " | RAM: " << ram_mb << " MB";
         }
@@ -858,15 +862,11 @@ int main(int argc, char** argv) {
         if (!auto_handoff) {
             std::cout << d << "Hybrid handoff off (--no-cloud-handoff): answering fully on-device." << r << "\n\n";
         } else {
-            std::string ratio = (confidence_threshold >= 0.0)
-                ? std::to_string(static_cast<int>(confidence_threshold * 100.0 + 0.5)) + "%"
-                : "50% (model default)";
             std::cout << d
-                      << "Hybrid mode: answers on-device and hands off to the cloud when the local\n"
-                      << "model's confidence drops below " << ratio << ". "
-                      << "Tune with --confidence-threshold <0-1>;\n"
-                      << "pass --no-cloud-handoff to stay fully local. "
-                      << "Each reply's confidence is shown in its stats line." << r << "\n\n";
+                      << "Hybrid mode: answers on-device, handing off to the cloud whenever the local\n"
+                      << "model's confidence drops below its default threshold. Set your own with\n"
+                      << "--confidence-threshold <0-1>, or pass --no-cloud-handoff to stay fully local.\n"
+                      << "Each reply's confidence and the active threshold are shown in its stats line." << r << "\n\n";
         }
     }
 
@@ -1026,7 +1026,8 @@ int main(int argc, char** argv) {
         double decode_tps = json_number_value(response_json, "decode_tps", -1.0);
         double ttft_ms = json_number_value(response_json, "time_to_first_token_ms", -1.0);
         double total_ms = json_number_value(response_json, "total_time_ms", -1.0);
-        printer.print_stats(ram_mb, confidence, cloud_handoff, threshold, decode_tokens, decode_tps, ttft_ms, total_ms);
+        std::string cloud_reason = json_string_value(response_json, "cloud_handoff_reason");
+        printer.print_stats(ram_mb, confidence, cloud_handoff, threshold, decode_tokens, decode_tps, ttft_ms, total_ms, cloud_reason);
 
         if (rc < 0) {
             std::cout << "Error: " << response.data() << "\n";

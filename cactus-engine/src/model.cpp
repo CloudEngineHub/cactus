@@ -1788,8 +1788,10 @@ uint32_t Model::argmax_last_logits(float* out_uncertainty) {
     return argmax_component_logits(*decoder_, std::numeric_limits<size_t>::max(), out_uncertainty);
 }
 
-bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, uint32_t& out_token) {
+bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, uint32_t& out_token,
+                                           float* out_uncertainty) {
     reset_prefill_stats();
+    if (out_uncertainty) *out_uncertainty = 0.0f;
     if (tokens.empty() || !decoder_ || cache_total_seq_len_ != 0) {
         return false;
     }
@@ -1817,7 +1819,7 @@ bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, 
         context_tokens_.insert(context_tokens_.end(), tokens.begin(), tokens.end());
         run_full_context_text();
         cache_total_seq_len_ = context_tokens_.size();
-        out_token = argmax_last_logits();
+        out_token = argmax_last_logits(out_uncertainty);
         record_sampled_token(out_token);
         return true;
     }
@@ -1826,7 +1828,7 @@ bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, 
             run_step(tokens[i], i, i + 1 == tokens.size());
         }
         cache_total_seq_len_ = tokens.size();
-        out_token = argmax_last_logits();
+        out_token = argmax_last_logits(out_uncertainty);
         record_sampled_token(out_token);
         return true;
     }
@@ -1842,7 +1844,7 @@ bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, 
             cache_total_seq_len_ = tokens.size() - 1;
             run_step(tokens.back(), cache_total_seq_len_, true);
             ++cache_total_seq_len_;
-            out_token = argmax_last_logits();
+            out_token = argmax_last_logits(out_uncertainty);
             record_sampled_token(out_token);
             last_prefill_scalar_tail_tokens_ = 1;
             maybe_roll_compact();
@@ -1856,9 +1858,9 @@ bool Model::prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, 
     }
     last_prefill_scalar_tail_tokens_ = tokens.size() - chunked.logical_tokens;
     if (chunked.logical_tokens == tokens.size() && chunked.logical_tokens > 0 && decoder_prefill_) {
-        out_token = argmax_component_logits(*decoder_prefill_, chunked.last_logit_row);
+        out_token = argmax_component_logits(*decoder_prefill_, chunked.last_logit_row, out_uncertainty);
     } else {
-        out_token = argmax_last_logits();
+        out_token = argmax_last_logits(out_uncertainty);
     }
     record_sampled_token(out_token);
     maybe_roll_compact();

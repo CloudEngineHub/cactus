@@ -631,7 +631,8 @@ public:
     uint32_t decode(const std::vector<uint32_t>& tokens, float temperature = -1.0f, float top_p = -1.0f,
                     size_t top_k = 0, const std::string& profile_file = "", float* out_entropy = nullptr,
                     float min_p = 0.15f, float repetition_penalty = 1.1f);
-    bool prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, uint32_t& out_token);
+    bool prefill_and_sample_first_token(const std::vector<uint32_t>& tokens, uint32_t& out_token,
+                                        float* out_uncertainty = nullptr);
 
     void prefill(const std::vector<uint32_t>& tokens, size_t chunk_size = 128, const std::string& profile_file = "",
                  bool prepare_decode = true);
