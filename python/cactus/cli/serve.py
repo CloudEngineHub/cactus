@@ -28,8 +28,10 @@ def cmd_serve(args):
     model_path, model_name = _resolve_model_arg(args.model)
     if args.model and model_path is None:
         from .model import ensure_runnable_bundle
+        from .download import resolve_platform
         try:
-            built = ensure_runnable_bundle(args.model)
+            built = ensure_runnable_bundle(
+                args.model, bits=args.bits, platform=resolve_platform(args.platform))
         except RuntimeError as exc:
             print_color(RED, f"Error: could not prepare {args.model}: {exc}")
             return 1

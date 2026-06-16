@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .common import GREEN, PROJECT_ROOT, YELLOW, print_color
@@ -211,8 +211,11 @@ def ensure_runnable_bundle(model_id, *, bits=4, platform=None, token=None,
         except (RuntimeError, OSError) as exc:
             print_color(YELLOW, f"No prebuilt bundle ({exc}); building locally")
 
-    return ensure_bundle(model_id, bits=bits, token=token,
-                         reconvert=reconvert, transpile=transpile or TranspileOptions())
+    opts = transpile or TranspileOptions()
+    if platform == "apple" and not opts.npu:
+        opts = replace(opts, npu=True)
+    return ensure_bundle(model_id, bits=bits, token=token, reconvert=reconvert,
+                         output_dir=cached, transpile=opts)
 
 
 def ensure_bundle(model_id, *, bits=4, token=None,

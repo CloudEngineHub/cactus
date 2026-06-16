@@ -108,6 +108,8 @@ def create_parser():
   cactus transcribe [model]            transcribe audio with a model
     --file <audio.wav>                 audio file to transcribe (required)
     --language <code>                  language code (default: en)
+    --bits 1|2|3|4                     CQ quantization (default: 4)
+    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
     --token <token>                    HuggingFace token (gated models)
     --reconvert                        force reconversion from source
 
@@ -119,6 +121,8 @@ def create_parser():
   cactus serve [model]                 OpenAI-compatible local HTTP server
     --host <addr>                      bind address (default: 127.0.0.1)
     --port <port>                      port (default: 8080)
+    --bits 1|2|3|4                     CQ quantization (default: 4)
+    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
 
   cactus list                          list local converted weights and bundles
 
@@ -267,6 +271,10 @@ def create_parser():
                                    help="Audio file to transcribe (WAV)")
     transcribe_parser.add_argument("--language", default="en",
                                    help="Language code (default: en)")
+    transcribe_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
+                                   help="CQ quantization (default: 4)")
+    transcribe_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
+                                   help="Target accelerator (default: auto)")
     transcribe_parser.add_argument("--token", help="HuggingFace token")
     transcribe_parser.add_argument("--force-handoff", action="store_true",
                                    help=argparse.SUPPRESS)
@@ -281,6 +289,10 @@ def create_parser():
                               help="Bind address (default: 127.0.0.1)")
     serve_parser.add_argument("--port", type=_port_int, default=8080,
                               help="Port (default: 8080)")
+    serve_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
+                              help="CQ quantization (default: 4)")
+    serve_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
+                              help="Target accelerator (default: auto)")
 
     test_parser = subparsers.add_parser("test", help="Run the test suite")
     test_parser.add_argument("--component", choices=COMPONENTS, default="all",
