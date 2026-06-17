@@ -24,10 +24,7 @@ class AudioEncoderWrapper(torch.nn.Module):
 
 
 def _import_coremltools() -> Any:
-    try:
-        import coremltools as ct
-    except ImportError as exc:
-        raise RuntimeError("--npu requires `pip install coremltools`") from exc
+    import coremltools as ct
     from .coremltools_patches import apply_all_coremltools_patches
     apply_all_coremltools_patches()
     return ct
