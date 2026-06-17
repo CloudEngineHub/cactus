@@ -105,8 +105,8 @@ def create_parser():
     --token <token>                    HuggingFace token (gated models)
     --reconvert                        force local convert+transpile fallback
 
-  cactus transcribe [model]            transcribe audio with a model
-    --file <audio.wav>                 audio file to transcribe (required)
+  cactus transcribe [model]            live microphone transcription with a model
+    --file <audio.wav>                 audio file to transcribe (WAV)
     --language <code>                  language code (default: en)
     --bits 1|2|3|4                     CQ quantization (default: 4)
     --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
@@ -267,7 +267,7 @@ def create_parser():
     transcribe_parser.add_argument("model_id", nargs="?", default=DEFAULT_TRANSCRIPTION_MODEL_ID,
                                    type=_hf_id_or_path,
                                    help=f"HuggingFace model id (default: {DEFAULT_TRANSCRIPTION_MODEL_ID})")
-    transcribe_parser.add_argument("--file", dest="audio_file", required=True,
+    transcribe_parser.add_argument("--file", dest="audio_file", default=None,
                                    help="Audio file to transcribe (WAV)")
     transcribe_parser.add_argument("--language", default="en",
                                    help="Language code (default: en)")
@@ -304,7 +304,7 @@ def create_parser():
                              type=_hf_id_or_path,
                              help=f"HF transcription model ID under test (default: {DEFAULT_TEST_TRANSCRIPTION_MODEL_ID})")
     test_parser.add_argument("--suite", default=None,
-                             help="Run a single test suite by name; resolved across all components (e.g. llm → engine, performance → kernels + graph)")
+                             help="Run a single test suite by name; resolved across all components (e.g. llm → engine)")
     test_parser.add_argument("--list", action="store_true",
                              help="List available components and engine tests, then exit")
     test_parser.add_argument("--android", action="store_true", help="Run tests on Android")

@@ -87,7 +87,9 @@ Example response from Gemma3-270m
     "cloud_handoff": false, // true if cloud model used
     "response": "Hi there!",
     "function_calls": [],   // parsed tool calls
+    "segments": [],         // transcription segments (empty for chat)
     "confidence": 0.8193,   // model confidence
+    "confidence_threshold": 0.7, // resolved handoff threshold (model-dependent)
     "time_to_first_token_ms": 45.23,
     "total_time_ms": 163.67,
     "prefill_tps": 1621.89,
@@ -192,9 +194,9 @@ graph.hard_reset();
 │    --status                          show key status                           │
 │    --clear                           remove saved key                          │
 │                                                                                │
-│  cactus run <model|path>             run a model (downloads if needed)         │
+│  cactus run [model|path]             run a model (downloads if needed)         │
 │    --bits 1|2|3|4                    CQ quantization (default: 4)              │
-│    --platform cpu|apple              target accelerator (default: cpu)         │
+│    --platform auto|cpu|apple         target accelerator (default: auto)        │
 │    --image <path>                    image file for VLM inference              │
 │    --audio <path>                    audio file for audio chat                 │
 │    --system <prompt>                 system prompt                             │
@@ -203,15 +205,15 @@ graph.hard_reset();
 │    --token <token>                   HuggingFace token (gated models)          │
 │    --reconvert                       force local convert+transpile fallback    │
 │                                                                                │
-│  cactus transcribe [model]           transcribe audio with a model             │
-│    --file <audio.wav>                audio file to transcribe (required)       │
+│  cactus transcribe [model]           live microphone transcription with a model│
+│    --file <audio.wav>                audio file to transcribe (WAV)            │
 │    --language <code>                 language code (default: en)               │
 │    --token <token>                   HuggingFace token (gated models)          │
 │    --reconvert                       force reconversion from source            │
 │                                                                                │
-│  cactus download <model>             download a pre-built bundle               │
+│  cactus download [model]             download a pre-built bundle               │
 │    --bits 1|2|3|4                    CQ quantization (default: 4)              │
-│    --platform cpu|apple              target accelerator (default: cpu)         │
+│    --platform auto|cpu|apple         target accelerator (default: auto)        │
 │    --token <token>                   HuggingFace token                         │
 │                                                                                │
 │  cactus convert <model> [dir]        convert HuggingFace weights to CQ         │
@@ -241,15 +243,15 @@ graph.hard_reset();
 │                                      (default: all)                            │
 │    --model <hf-id>                   default: LiquidAI/LFM2-VL-450M            │
 │    --transcription-model <hf-id>     default: openai/whisper-base              │
-│    --suite <name>                    run a single test suite (resolved         │
-│                                      across components; e.g. performance       │
-│                                      → kernels + graph, llm → engine)          │
+│    --suite <name>                    run a single test suite by name           │
+│                                      (resolved across components,              │
+│                                      e.g. llm → engine)                        │
 │    --list                            list components and suites                │
 │    --ios                             run on connected iPhone                   │
 │    --android                         run on connected Android                  │
 │    --enable-telemetry                send cloud telemetry (off by default)     │
 │                                                                                │
-│  cactus clean                        delete build artifacts                    │
+│  cactus clean                        delete build artifacts, weights, venv     │
 │  cactus --help                       show this help                            │
 │                                                                                │
 └────────────────────────────────────────────────────────────────────────────────┘

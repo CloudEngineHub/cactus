@@ -666,6 +666,18 @@ _lib.cactus_transcribe.argtypes = [
 ]
 _lib.cactus_transcribe.restype = ctypes.c_int
 
+_lib.cactus_stream_transcribe_start.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+_lib.cactus_stream_transcribe_start.restype = ctypes.c_void_p
+
+_lib.cactus_stream_transcribe_process.argtypes = [
+    ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
+    ctypes.c_char_p, ctypes.c_size_t
+]
+_lib.cactus_stream_transcribe_process.restype = ctypes.c_int
+
+_lib.cactus_stream_transcribe_stop.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
+_lib.cactus_stream_transcribe_stop.restype = ctypes.c_int
+
 _bind_optional(
     "cactus_detect_language",
     [
@@ -1028,12 +1040,15 @@ def cactus_transcribe(model, audio_path, prompt=None, options=None, callback=Non
         model:      Model handle.
         audio_path: Path to a WAV audio file.
         prompt:     Optional prompt to guide transcription.
-        options:    Optional dict of transcription options.
+        options:    Optional dict of transcription options. Set ``timestamps: True`` (Whisper
+                    only) to populate the ``segments`` array.
         callback:   Optional function(text, token_id) for streaming tokens.
         pcm_data:   Optional raw PCM audio bytes (alternative to audio_path).
 
     Returns:
-        A dict with transcription text and segments.
+        A dict with the transcribed text under ``response`` and a ``segments`` array of
+        ``{start, end, text}`` objects, populated only for Whisper when ``timestamps`` is set
+        (empty otherwise, including all Parakeet transcription).
     """
     buf = ctypes.create_string_buffer(1 << 20)
     cb = _make_token_callback(callback)
@@ -1044,6 +1059,62 @@ def cactus_transcribe(model, audio_path, prompt=None, options=None, callback=Non
     )
     if rc < 0:
         raise RuntimeError(_err("Transcription failed"))
+    return _from_json(buf)
+
+
+def cactus_stream_transcribe_start(model, options=None):
+    """Open a streaming transcription session on a Whisper or Parakeet TDT model.
+
+    Args:
+        model:   Model handle.
+        options: Optional dict forwarded to the underlying transcribe call
+                 (e.g. {"language": "en", "max_tokens": 256}); chunking is
+                 handled internally.
+
+    Returns:
+        An opaque stream handle. Feed audio with cactus_stream_transcribe_process
+        and finish with cactus_stream_transcribe_stop.
+    """
+    stream = _lib.cactus_stream_transcribe_start(model, _to_json(options))
+    if not stream:
+        raise RuntimeError(_err("Failed to start streaming transcription"))
+    return stream
+
+
+def cactus_stream_transcribe_process(stream, pcm_data):
+    """Feed the next slice of audio to a streaming session.
+
+    Args:
+        stream:   Stream handle from cactus_stream_transcribe_start.
+        pcm_data: 16 kHz mono 16-bit PCM audio bytes for this chunk.
+
+    Returns:
+        A dict with "confirmed" (newly finalized text, append it), "pending" (volatile tail,
+        replace it each call), and per-call stats ("decode_tps",
+        "total_time_ms", "time_to_first_token_ms", "decode_tokens").
+    """
+    buf = ctypes.create_string_buffer(1 << 16)
+    pcm_ptr, pcm_size = _prepare_pcm(pcm_data)
+    rc = _lib.cactus_stream_transcribe_process(stream, pcm_ptr, pcm_size, buf, len(buf))
+    if rc < 0:
+        raise RuntimeError(_err("Stream transcription failed"))
+    return _from_json(buf)
+
+
+def cactus_stream_transcribe_stop(stream):
+    """Flush buffered audio, return the final text, and destroy the session.
+
+    Args:
+        stream: Stream handle from cactus_stream_transcribe_start.
+
+    Returns:
+        A dict {"success": True, "confirmed": <remaining finalized text>, "pending": ""}. The handle is invalid
+        after this call.
+    """
+    buf = ctypes.create_string_buffer(1 << 16)
+    rc = _lib.cactus_stream_transcribe_stop(stream, buf, len(buf))
+    if rc < 0:
+        raise RuntimeError(_err("Stream transcription stop failed"))
     return _from_json(buf)
 
 
