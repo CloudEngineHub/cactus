@@ -25,9 +25,21 @@ _ORDERED_KEYS = (
 )
 
 
-def _candidate_probe_files(output_dir: Path) -> list[Path]:
+def _packaged_asset_dir(model_id: str | None) -> Path | None:
+    if not model_id:
+        return None
+    from ..cli.download import get_model_dir_name
+
+    return Path(__file__).resolve().parent / "assets" / get_model_dir_name(model_id)
+
+
+def _candidate_probe_files(output_dir: Path, model_id: str | None = None) -> list[Path]:
     cwd = Path.cwd()
-    return [
+    candidates: list[Path] = []
+    asset_dir = _packaged_asset_dir(model_id)
+    if asset_dir is not None:
+        candidates.append(asset_dir / "probe.pt")
+    candidates += [
         output_dir / "probe.pt",
         output_dir / "global_attn_probe_v10p6.pt",
         cwd / "probe.pt",
@@ -35,6 +47,7 @@ def _candidate_probe_files(output_dir: Path) -> list[Path]:
         Path.home() / "Downloads" / "probe.pt",
         Path.home() / "Downloads" / "v10p6_probe_release" / "global_attn_probe_v10p6.pt",
     ]
+    return candidates
 
 
 def _candidate_probe_zips(output_dir: Path) -> list[Path]:
@@ -71,10 +84,10 @@ def _state_dict_from_checkpoint(checkpoint: Any) -> dict[str, Any]:
     return checkpoint
 
 
-def _load_checkpoint(output_dir: Path) -> tuple[Any, str] | tuple[None, None]:
+def _load_checkpoint(output_dir: Path, model_id: str | None = None) -> tuple[Any, str] | tuple[None, None]:
     import torch
 
-    for path in _candidate_probe_files(output_dir):
+    for path in _candidate_probe_files(output_dir, model_id):
         if path.exists():
             return torch.load(path, map_location="cpu"), str(path)
     for path in _candidate_probe_zips(output_dir):
@@ -132,7 +145,7 @@ def export_gemma4_handoff_probe(output_dir: str | Path, *, model_id: str | None 
         return False
 
     out_dir = Path(output_dir)
-    checkpoint, source = _load_checkpoint(out_dir)
+    checkpoint, source = _load_checkpoint(out_dir, model_id)
     if checkpoint is None:
         return False
 
@@ -147,12 +160,17 @@ _PARAKEET_PROBE_FILE = "parakeet_v3_probe.pt"
 _PARAKEET_PROBE_LAYER = 23
 
 
-def _candidate_parakeet_probe_files(output_dir: Path) -> list[Path]:
-    return [
+def _candidate_parakeet_probe_files(output_dir: Path, model_id: str | None = None) -> list[Path]:
+    candidates: list[Path] = []
+    asset_dir = _packaged_asset_dir(model_id)
+    if asset_dir is not None:
+        candidates.append(asset_dir / _PARAKEET_PROBE_FILE)
+    candidates += [
         output_dir / _PARAKEET_PROBE_FILE,
         Path.cwd() / _PARAKEET_PROBE_FILE,
         Path.home() / "Downloads" / _PARAKEET_PROBE_FILE,
     ]
+    return candidates
 
 
 def export_parakeet_handoff_probe(output_dir: str | Path, *, model_id: str | None = None) -> bool:
@@ -163,7 +181,7 @@ def export_parakeet_handoff_probe(output_dir: str | Path, *, model_id: str | Non
 
     out_dir = Path(output_dir)
     checkpoint = source = None
-    for path in _candidate_parakeet_probe_files(out_dir):
+    for path in _candidate_parakeet_probe_files(out_dir, model_id):
         if path.exists():
             import torch
 

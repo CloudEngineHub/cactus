@@ -67,6 +67,7 @@ include = ["cactus*"]
 [tool.setuptools.package-data]
 "cactus.bindings" = ["lib/*.dylib", "lib/*.so"]
 "cactus" = ["bin/run", "bin/transcribe", "assets/*"]
+"cactus.convert" = ["assets/*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
