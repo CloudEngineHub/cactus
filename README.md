@@ -196,42 +196,48 @@ graph.hard_reset();
 │                                                                                │
 │  cactus run [model|path]             run a model (downloads if needed)         │
 │    --bits 1|2|3|4                    CQ quantization (default: 4)              │
-│    --platform auto|cpu|apple         target accelerator (default: auto)        │
+│    --platform auto|cpu|apple         target platform (default: auto)           │
 │    --image <path>                    image file for VLM inference              │
 │    --audio <path>                    audio file for audio chat                 │
 │    --system <prompt>                 system prompt                             │
 │    --prompt <text>                   send prompt immediately                   │
 │    --thinking                        enable thinking/reasoning mode            │
 │    --token <token>                   HuggingFace token (gated models)          │
-│    --reconvert                       force local convert+transpile fallback    │
+│    --reconvert                       force local rebuild from source           │
 │                                                                                │
 │  cactus transcribe [model]           live microphone transcription with a model│
 │    --file <audio.wav>                audio file to transcribe (WAV)            │
 │    --language <code>                 language code (default: en)               │
+│    --bits 1|2|3|4                    CQ quantization (default: 4)              │
+│    --platform auto|cpu|apple         target platform (default: auto)           │
 │    --token <token>                   HuggingFace token (gated models)          │
-│    --reconvert                       force reconversion from source            │
+│    --reconvert                       force local rebuild from source           │
 │                                                                                │
-│  cactus download [model]             download a pre-built bundle               │
+│  cactus download [model]             get a bundle (prebuilt, else build)       │
 │    --bits 1|2|3|4                    CQ quantization (default: 4)              │
-│    --platform auto|cpu|apple         target accelerator (default: auto)        │
-│    --token <token>                   HuggingFace token                         │
+│    --platform auto|cpu|apple         target platform (default: auto)           │
+│    --token <token>                   HuggingFace token (gated models)          │
+│    --reconvert                       force local rebuild from source           │
 │                                                                                │
-│  cactus convert <model> [dir]        convert HuggingFace weights to CQ         │
+│  cactus convert <model> [dir]        build a runnable bundle locally           │
 │    --bits 1|2|3|4                    CQ quantization (default: 4)              │
-│    --token <token>                   HuggingFace token                         │
-│    --reconvert                       force build from source                   │
+│    --platform auto|cpu|apple         target platform (default: auto)           │
+│    --token <token>                   HuggingFace token (gated models)          │
+│    --reconvert                       force local rebuild from source           │
 │    --lora <path>                     merge a LoRA adapter before converting    │
-│                                                                                │
-│  cactus transpile <model>            build a runnable bundle from CQ weights   │
-│    --weights-dir <path>              path to CQ weights (default: lookup)      │
-│    --task <auto|...>                 force task type (default: auto)           │
-│    --artifact-dir <path>             bundle output (default: weights/<model>)  │
 │                                                                                │
 │  cactus serve [model]                OpenAI-compatible local HTTP server       │
 │    --host <addr>                     bind address (default: 127.0.0.1)         │
 │    --port <port>                     port (default: 8080)                      │
+│    --bits 1|2|3|4                    CQ quantization (default: 4)              │
+│    --platform auto|cpu|apple         target platform (default: auto)           │
+│    --token <token>                   HuggingFace token (gated models)          │
+│    --reconvert                       force local rebuild from source           │
+│    --no-cloud-handoff                disable automatic cloud handoff           │
+│    --confidence-threshold <0..1>     handoff to cloud below this confidence    │
+│    --cloud-timeout-ms <n>            max wait for cloud handoff                │
 │                                                                                │
-│  cactus list                         list local converted weights and bundles  │
+│  cactus list                         list downloaded models                    │
 │                                                                                │
 │  cactus build                        build cactus libraries                    │
 │    --apple                           Apple (iOS/macOS)                         │
@@ -243,6 +249,10 @@ graph.hard_reset();
 │                                      (default: all)                            │
 │    --model <hf-id>                   default: LiquidAI/LFM2-VL-450M            │
 │    --transcription-model <hf-id>     default: openai/whisper-base              │
+│    --bits 1|2|3|4                    CQ quantization (default: 4)              │
+│    --platform auto|cpu|apple         target platform (default: auto)           │
+│    --token <token>                   HuggingFace token (gated models)          │
+│    --reconvert                       force local rebuild of test models        │
 │    --suite <name>                    run a single test suite by name           │
 │                                      (resolved across components,              │
 │                                      e.g. llm → engine)                        │

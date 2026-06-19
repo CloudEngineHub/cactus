@@ -13,7 +13,7 @@ from .download import cmd_download
 
 _PLATFORM_CHOICES = ("auto", "cpu", *SUPPORTED_PLATFORMS)
 _PLATFORM_HELP = (
-    f"target accelerator: auto = best for this host, e.g. apple on macOS (default); "
+    f"target platform: auto = best for this host, e.g. apple on macOS (default); "
     f"cpu = generic ARM; "
     f"or one of: {', '.join(SUPPORTED_PLATFORMS) if SUPPORTED_PLATFORMS else '(none yet)'}"
 )
@@ -23,6 +23,7 @@ from .serve import cmd_serve
 from .transcribe import cmd_transcribe
 from .test import cmd_test, COMPONENTS
 from .convert import cmd_convert, cmd_transpile
+from .upload import cmd_upload
 from .run import cmd_run
 from .list import cmd_list
 
@@ -35,6 +36,19 @@ def _telemetry_parent():
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--no-cloud-tele", action="store_true",
                    help="Disable cloud telemetry (write to cache only)")
+    return p
+
+
+def _build_parent():
+    """Bundle-build flags shared by every command that prepares a model."""
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
+                   help="CQ quantization (default: 4)")
+    p.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
+                   help=_PLATFORM_HELP)
+    p.add_argument("--token", help="HuggingFace token")
+    p.add_argument("--reconvert", action="store_true",
+                   help="Force local rebuild from source")
     return p
 
 
@@ -96,35 +110,48 @@ def create_parser():
 
   cactus run [model|path]              run a model (default: {DEFAULT_MODEL_ID})
     --bits 1|2|3|4                     CQ quantization (default: 4)
-    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
+    --platform {_PLATFORM_PIPE:<22}  target platform (default: auto)
     --image <path>                     image file for VLM inference
     --audio <path>                     audio file for audio chat
     --system <prompt>                  system prompt
     --prompt <text>                    send prompt immediately
     --thinking                         enable thinking/reasoning mode
     --token <token>                    HuggingFace token (gated models)
-    --reconvert                        force local convert+transpile fallback
+    --reconvert                        force local rebuild from source
 
   cactus transcribe [model]            live microphone transcription with a model
     --file <audio.wav>                 audio file to transcribe (WAV)
     --language <code>                  language code (default: en)
     --bits 1|2|3|4                     CQ quantization (default: 4)
-    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
+    --platform {_PLATFORM_PIPE:<22}  target platform (default: auto)
     --token <token>                    HuggingFace token (gated models)
-    --reconvert                        force reconversion from source
+    --reconvert                        force local rebuild from source
 
   cactus download [model]              fetch a prebuilt bundle, else build locally (default: {DEFAULT_MODEL_ID})
     --bits 1|2|3|4                     CQ quantization (default: 4)
-    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
-    --token <token>                    HuggingFace token
+    --platform {_PLATFORM_PIPE:<22}  target platform (default: auto)
+    --token <token>                    HuggingFace token (gated models)
+    --reconvert                        force local rebuild from source
+
+  cactus convert <model> [dir]         build a runnable bundle locally (skips prebuilt fetch)
+    --bits 1|2|3|4                     CQ quantization (default: 4)
+    --platform {_PLATFORM_PIPE:<22}  target platform (default: auto)
+    --token <token>                    HuggingFace token (gated models)
+    --reconvert                        force local rebuild from source
+    --lora <path>                      merge a LoRA adapter before converting
 
   cactus serve [model]                 OpenAI-compatible local HTTP server
     --host <addr>                      bind address (default: 127.0.0.1)
     --port <port>                      port (default: 8080)
     --bits 1|2|3|4                     CQ quantization (default: 4)
-    --platform {_PLATFORM_PIPE:<22}  target accelerator (default: auto)
+    --platform {_PLATFORM_PIPE:<22}  target platform (default: auto)
+    --token <token>                    HuggingFace token (gated models)
+    --reconvert                        force local rebuild from source
+    --no-cloud-handoff                 disable automatic cloud handoff
+    --confidence-threshold <0..1>      handoff to cloud below this confidence
+    --cloud-timeout-ms <n>             max wait for cloud handoff before local fallback
 
-  cactus list                          list local converted weights and bundles
+  cactus list                          list downloaded models
 
   cactus build                         build cactus libraries
     --apple                            Apple (iOS/macOS)
@@ -136,6 +163,10 @@ def create_parser():
                                        (default: all)
     --model <hf-id>                    default: {DEFAULT_TEST_MODEL_ID}
     --transcription-model <hf-id>      default: {DEFAULT_TEST_TRANSCRIPTION_MODEL_ID}
+    --bits 1|2|3|4                     CQ quantization (default: 4)
+    --platform {_PLATFORM_PIPE:<22}  target platform (default: auto)
+    --token <token>                    HuggingFace token (gated models)
+    --reconvert                        force local rebuild of test models
     --suite <name>                     run a single test suite from any
                                        component (kernels, graph, or engine)
     --list                             list components and suites
@@ -144,51 +175,8 @@ def create_parser():
     --enable-telemetry                 send cloud telemetry (off by default)
 
   cactus clean                         delete build artifacts, weights, venv
+
   cactus --help                        show this help
-
-  -----------------------------------------------------------------
-
-  Advanced / build pipeline — the two manual steps below run
-  automatically inside run, serve, transcribe and download; reach for
-  them only to control the build (custom flags, LoRA, NPU, debugging):
-
-  cactus convert <model> [dir]         convert HuggingFace weights to CQ
-    --bits 1|2|3|4                     CQ quantization (default: 4)
-    --token <token>                    HuggingFace token
-    --reconvert                        force build from source
-    --lora <path>                      merge a LoRA adapter before converting
-
-  cactus transpile <model>             build a runnable bundle from CQ weights
-    --weights-dir <path>               path to CQ weights (default: weights/<model>)
-    --task <auto|...>                  task (default: auto, inferred from model config)
-    --artifact-dir <path>              write bundle here (default: weights/<model>)
-    --prompt <text>                    representative prompt for shape capture
-    --system-prompt <text>             system prompt for multimodal chat
-    --enable-thinking                  enable thinking markers when supported
-    --input-ids <a,b,...>              token ids for causal-LM shape capture
-    --image-file <path>                representative image (repeatable)
-    --audio-file <path>                representative audio file (WAV)
-    --max-new-tokens <n>               preallocate decode context for causal LM
-    --component-pipeline auto|on|off   force component-pipeline transpilation
-    --components <a,b,...>             subset of components to transpile
-    --torch-dtype <dtype>              float16 | float32 | bfloat16
-    --token <token>                    HuggingFace token (defaults to $HF_TOKEN)
-    --trust-remote-code                allow HF remote code at transpile time
-    --local-files-only                 require model/processor to be local
-    --allow-unconverted-weights        debug-only: skip the CQ-weights check
-    --execute-after-transpile          run a reference execution after lowering
-    --graph-filename <name>            override saved graph filename
-    --skip-reference-compare           skip PyTorch comparison (with --execute-…)
-    --no-fuse-rms-norm                 disable RMSNorm fusion
-    --no-fuse-rope                     disable RoPE fusion
-    --no-fuse-attention                disable attention fusion
-    --no-fuse-attention-block          disable attention-block fusion
-    --no-fuse-add-clipped              disable add-clipped fusion
-    --no-fuse-gated-deltanet           disable gated DeltaNet fusion
-    --npu                              also emit CoreML .mlpackage(s) for NPU
-    --npu-quantize 0|4|8               force both NPU encoders to this quant
-    --npu-audio-quantize 0|4|8         audio encoder quant (default int8)
-    --npu-vision-quantize 0|4|8        vision encoder quant (default fp16)
 
   -----------------------------------------------------------------
 """
@@ -206,15 +194,11 @@ def create_parser():
     parser._action_groups = []
 
     download_parser = subparsers.add_parser("download",
-                                            help="Download a pre-built bundle from huggingface.co/Cactus-Compute")
+                                            help="Download a pre-built bundle from huggingface.co/Cactus-Compute",
+                                            parents=[_build_parent()])
     download_parser.add_argument("model_id", nargs="?", default=DEFAULT_MODEL_ID,
                                  type=_hf_id_or_path,
                                  help=f"HuggingFace model id (default: {DEFAULT_MODEL_ID})")
-    download_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
-                                 help="CQ quantization bits (default: 4)")
-    download_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
-                                 help=_PLATFORM_HELP)
-    download_parser.add_argument("--token", help="HuggingFace token")
 
     build_parser = subparsers.add_parser("build", help="Build cactus libraries")
     build_group = build_parser.add_mutually_exclusive_group()
@@ -226,17 +210,10 @@ def create_parser():
                              help="Build shared library for Python FFI")
 
     run_parser = subparsers.add_parser("run", help="Run a model (downloads bundle if needed)",
-                                       parents=[_telemetry_parent()])
+                                       parents=[_telemetry_parent(), _build_parent()])
     run_parser.add_argument("model_id", nargs="?", default=DEFAULT_MODEL_ID,
                             type=_hf_id_or_path,
                             help=f"HuggingFace model id or local bundle path (default: {DEFAULT_MODEL_ID})")
-    run_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
-                            help="CQ quantization bits (default: 4)")
-    run_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
-                            help=_PLATFORM_HELP)
-    run_parser.add_argument("--token", help="HuggingFace token")
-    run_parser.add_argument("--reconvert", action="store_true",
-                            help="Force local convert+transpile fallback")
     run_parser.add_argument("--image",
                             help="Path to image file for VLM inference (attached to first message)")
     run_parser.add_argument("--audio",
@@ -246,13 +223,13 @@ def create_parser():
     run_parser.add_argument("--prompt",
                             help="Initial prompt to send immediately")
     run_parser.add_argument("--input-ids", default=None,
-                            help="Comma-separated token ids for transpiled causal-LM bundles")
+                            help="Comma-separated token ids for causal-LM bundles")
     run_parser.add_argument("--input-ids-file", default=None,
-                            help="File containing token ids for transpiled causal-LM bundles")
+                            help="File containing token ids for causal-LM bundles")
     run_parser.add_argument("--max-new-tokens", type=_positive_int, default=None,
-                            help="Maximum tokens to generate for transpiled causal-LM bundles")
+                            help="Maximum tokens to generate for causal-LM bundles")
     run_parser.add_argument("--result-json", default=None,
-                            help="Optional path to save transpiled bundle results as JSON")
+                            help="Optional path to save bundle results as JSON")
     run_parser.add_argument("--thinking", action="store_true",
                             help="Enable thinking/reasoning for models that support it")
     run_parser.add_argument("--no-cloud-handoff", action="store_true",
@@ -263,7 +240,7 @@ def create_parser():
                             help="Maximum time to wait for cloud handoff before falling back locally")
 
     transcribe_parser = subparsers.add_parser("transcribe", help="Transcribe audio with a model",
-                                              parents=[_telemetry_parent()])
+                                              parents=[_telemetry_parent(), _build_parent()])
     transcribe_parser.add_argument("model_id", nargs="?", default=DEFAULT_TRANSCRIPTION_MODEL_ID,
                                    type=_hf_id_or_path,
                                    help=f"HuggingFace model id (default: {DEFAULT_TRANSCRIPTION_MODEL_ID})")
@@ -271,30 +248,25 @@ def create_parser():
                                    help="Audio file to transcribe (WAV)")
     transcribe_parser.add_argument("--language", default="en",
                                    help="Language code (default: en)")
-    transcribe_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
-                                   help="CQ quantization (default: 4)")
-    transcribe_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
-                                   help="Target accelerator (default: auto)")
-    transcribe_parser.add_argument("--token", help="HuggingFace token")
-    transcribe_parser.add_argument("--force-handoff", action="store_true",
-                                   help=argparse.SUPPRESS)
-    transcribe_parser.add_argument("--reconvert", action="store_true",
-                                   help="Force reconversion from source")
 
-    serve_parser = subparsers.add_parser("serve", help="OpenAI-compatible local HTTP server")
-    serve_parser.add_argument("model", nargs="?", default=None,
+    serve_parser = subparsers.add_parser("serve", help="OpenAI-compatible local HTTP server",
+                                         parents=[_telemetry_parent(), _build_parent()])
+    serve_parser.add_argument("model_id", nargs="?", default=None,
                               type=_hf_id_or_path,
                               help="HuggingFace model id (e.g. openai/whisper-base) or bundle path")
     serve_parser.add_argument("--host", default="127.0.0.1",
                               help="Bind address (default: 127.0.0.1)")
     serve_parser.add_argument("--port", type=_port_int, default=8080,
                               help="Port (default: 8080)")
-    serve_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
-                              help="CQ quantization (default: 4)")
-    serve_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
-                              help="Target accelerator (default: auto)")
+    serve_parser.add_argument("--no-cloud-handoff", action="store_true",
+                              help="Disable automatic cloud handoff for all requests")
+    serve_parser.add_argument("--confidence-threshold", type=_unit_float, default=None,
+                              help="Confidence threshold below which completions hand off to cloud (1.0 forces cloud handoff)")
+    serve_parser.add_argument("--cloud-timeout-ms", type=_non_negative_int, default=None,
+                              help="Maximum time to wait for cloud handoff before falling back locally")
 
-    test_parser = subparsers.add_parser("test", help="Run the test suite")
+    test_parser = subparsers.add_parser("test", help="Run the test suite",
+                                        parents=[_build_parent()])
     test_parser.add_argument("--component", choices=COMPONENTS, default="all",
                              help="Component to test (default: all)")
     test_parser.add_argument("--model", dest="model_id", default=None,
@@ -321,21 +293,20 @@ def create_parser():
     clean_parser = subparsers.add_parser("clean", help="Delete build artifacts, downloaded weights, and venv")
     clean_parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
 
-    subparsers.add_parser("list", help="List local converted weights and bundles")
+    subparsers.add_parser("list", help="List downloaded models")
 
     convert_parser = subparsers.add_parser("convert",
-                                           help="Convert HuggingFace weights to CQ format")
+                                           help="Build a runnable bundle locally from source (no prebuilt fetch)",
+                                           parents=[_build_parent()])
     convert_parser.add_argument("model_id", type=_hf_id_or_path,
                                 help="HuggingFace model id (e.g. openai/whisper-base)")
     convert_parser.add_argument("output_dir", nargs="?", default=None,
                                 help="Output directory (default: weights/<model>)")
-    convert_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
-                                help="CQ quantization bits (default: 4)")
-    convert_parser.add_argument("--token", help="HuggingFace token")
     convert_parser.add_argument("--lora",
                                 help="Path or HF id of a LoRA adapter to merge before converting (requires `peft`)")
-    convert_parser.add_argument("--reconvert", action="store_true",
-                                help="Force conversion from source")
+
+    upload_parser = subparsers.add_parser("upload", parents=[_build_parent()])
+    upload_parser.add_argument("model_id", type=_hf_id_or_path)
 
     transpile_parser = subparsers.add_parser("transpile",
                                              help="Build a runnable bundle from CQ weights")
@@ -425,6 +396,7 @@ _COMMANDS = {
     "clean":          cmd_clean,
     "convert":        cmd_convert,
     "transpile":      cmd_transpile,
+    "upload":         cmd_upload,
 }
 
 
