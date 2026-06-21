@@ -67,7 +67,11 @@ cactus convert Qwen/Qwen3-0.6B ./my-qwen3-0.6b --lora username/my-lora-adapter
 
 ### 4. Run
 
+Build the native library, then run (the convert above already produced the runtime
+bundle alongside the CQ weights):
+
 ```bash
+cactus build
 cactus run ./my-qwen3-0.6b
 ```
 

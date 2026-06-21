@@ -183,6 +183,8 @@ Three patterns are visible:
 
 ## Using CQ Weights
 
+`cactus convert` quantizes the weights to CQ and builds the runtime bundle
+(graph + manifest) in one step. Run via `cactus run`:
 `cactus convert <model>` builds a runnable bundle locally; `cactus run` runs a
 bundle path or a model id.
 

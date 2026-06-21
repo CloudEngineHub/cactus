@@ -41,9 +41,8 @@ def _merge_lora_adapter(base_model_id, lora_path, token=None):
 
 
 def cmd_convert(args):
-    """Build a runnable bundle locally: convert HuggingFace weights to CQ and
-    transpile. Skips the prebuilt-bundle search — checks the local copy first
-    and builds from source if it is not present.
+    """Convert a HuggingFace model into a runnable cactus bundle: quantize weights to CQ,
+    then build the runtime graph. Pass --weights-only to stop after the weight conversion.
     """
     from .model import prepare_bundle
 
@@ -56,16 +55,24 @@ def cmd_convert(args):
             return 1
         source_model_id = merged_dir
 
-    output_dir = args.output_dir
-    if merged_dir and not output_dir:
-        from .download import get_bundle_dir, resolve_platform
-        output_dir = str(get_bundle_dir(args.model_id, bits=args.bits,
-                                        platform=resolve_platform(args.platform)))
+    output_dir = args.output_dir or str(get_weights_dir(args.model_id))
 
     try:
-        bundle = prepare_bundle(args, model_id=source_model_id, prebuilt=False,
-                                output_dir=output_dir, fail_prefix="Conversion error")
-        return 1 if bundle is None else 0
+        ensure_weights(
+            source_model_id,
+            bits=args.bits,
+            token=args.token,
+            reconvert=args.reconvert,
+            output_dir=output_dir,
+        )
+        if getattr(args, "weights_only", False):
+            return 0
+        args.weights_dir = args.weights_dir or output_dir
+        args.artifact_dir = args.artifact_dir or output_dir
+        return cmd_transpile(args)
+    except RuntimeError as e:
+        print_color(RED, f"Conversion error: {e}")
+        return 1
     finally:
         if merged_dir:
             shutil.rmtree(merged_dir, ignore_errors=True)
@@ -145,6 +152,10 @@ def cmd_transpile(args):
             extra_args.extend(["--npu-vision-quantize", str(args.npu_vision_quantize)])
     if args.cache_context_length is not None:
         extra_args.extend(["--cache-context-length", str(args.cache_context_length)])
+    if getattr(args, "dynamic_batch", False):
+        extra_args.append("--dynamic-batch")
+    if getattr(args, "max_slots", 1) and int(args.max_slots) != 1:
+        extra_args.extend(["--max-slots", str(args.max_slots)])
 
     return run_transpile(
         args.model_id,

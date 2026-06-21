@@ -219,12 +219,17 @@ graph.hard_reset();
 │    --token <token>                   HuggingFace token (gated models)          │
 │    --reconvert                       force local rebuild from source           │
 │                                                                                │
-│  cactus convert <model> [dir]        build a runnable bundle locally           │
+│  cactus convert <model> [dir]        HuggingFace -> runnable cactus bundle     │
+│                                      (CQ weights + runtime graph)              │
 │    --bits 1|2|3|4                    CQ quantization (default: 4)              │
 │    --platform auto|cpu|apple         target platform (default: auto)           │
 │    --token <token>                   HuggingFace token (gated models)          │
 │    --reconvert                       force local rebuild from source           │
 │    --lora <path>                     merge a LoRA adapter before converting    │
+│    --weights-only                    stop after CQ weights (skip the graph)    │
+│    --dynamic-batch                   dynamic-batch decoder graph (Gemma4)      │
+│    --max-slots <n>                   KV-cache slots for batched decode         │
+│    --artifact-dir <path>             bundle output (default: weights/<model>)  │
 │                                                                                │
 │  cactus serve [model]                OpenAI-compatible local HTTP server       │
 │    --host <addr>                     bind address (default: 127.0.0.1)         │
