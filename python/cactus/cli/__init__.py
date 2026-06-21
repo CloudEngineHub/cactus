@@ -23,7 +23,6 @@ from .serve import cmd_serve
 from .transcribe import cmd_transcribe
 from .test import cmd_test, COMPONENTS
 from .convert import cmd_convert
-from .convert import cmd_convert, cmd_transpile
 from .upload import cmd_upload
 from .run import cmd_run
 from .list import cmd_list
@@ -261,13 +260,6 @@ def create_parser():
     run_parser.add_argument("model_id", nargs="?", default=DEFAULT_MODEL_ID,
                             type=_hf_id_or_path,
                             help=f"HuggingFace model id or local bundle path (default: {DEFAULT_MODEL_ID})")
-    run_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
-                            help="CQ quantization bits (default: 4)")
-    run_parser.add_argument("--platform", choices=_PLATFORM_CHOICES, default="auto",
-                            help=_PLATFORM_HELP)
-    run_parser.add_argument("--token", help="HuggingFace token")
-    run_parser.add_argument("--reconvert", action="store_true",
-                            help="Force local convert fallback")
     run_parser.add_argument("--image",
                             help="Path to image file for VLM inference (attached to first message)")
     run_parser.add_argument("--audio",
@@ -355,6 +347,9 @@ def create_parser():
                                 help="HuggingFace model id (e.g. openai/whisper-base)")
     convert_parser.add_argument("output_dir", nargs="?", default=None,
                                 help="Output directory (default: weights/<model>)")
+    convert_parser.add_argument("--bits", type=int, choices=[1, 2, 3, 4], default=4,
+                                help="CQ quantization bits (default: 4)")
+    convert_parser.add_argument("--token", help="HuggingFace token")
     convert_parser.add_argument("--lora",
                                 help="Path or HF id of a LoRA adapter to merge before converting (requires `peft`)")
     convert_parser.add_argument("--reconvert", action="store_true",

@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 from .common import GREEN, RED, YELLOW, print_color
+from .download import get_weights_dir
 
 
 def _merge_lora_adapter(base_model_id, lora_path, token=None):
@@ -44,7 +45,7 @@ def cmd_convert(args):
     """Convert a HuggingFace model into a runnable cactus bundle: quantize weights to CQ,
     then build the runtime graph. Pass --weights-only to stop after the weight conversion.
     """
-    from .model import prepare_bundle
+    from .model import ensure_weights
 
     source_model_id = args.model_id
     merged_dir = None

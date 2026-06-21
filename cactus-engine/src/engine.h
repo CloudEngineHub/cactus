@@ -636,6 +636,8 @@ public:
 
     std::vector<std::vector<uint32_t>> decode_batch(const std::vector<uint32_t>& seed_tokens,
                                                     size_t max_new_tokens);
+    std::vector<std::vector<uint32_t>> generate_batch(const std::vector<std::vector<uint32_t>>& prompts,
+                                                      size_t max_new_tokens);
 
     void prefill(const std::vector<uint32_t>& tokens, size_t chunk_size = 128, const std::string& profile_file = "",
                  bool prepare_decode = true);
@@ -799,7 +801,7 @@ private:
     void unload_component_graph(Component& comp);
     bool bind_runtime_buffers(Component& comp);
     void run_step(uint32_t token_id, size_t position, bool read_logits);
-    void run_step_batch(const std::vector<uint32_t>& token_ids, size_t position);
+    void run_step_batch(const std::vector<uint32_t>& token_ids, const std::vector<size_t>& positions);
     void set_component_batch(Component& comp, size_t batch);
     size_t decoder_cache_num_slots();
     void run_encoder_step(uint32_t token_id, size_t position);

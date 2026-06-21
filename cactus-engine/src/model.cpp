@@ -923,10 +923,10 @@ size_t Model::decoder_cache_num_slots() {
     return 1;
 }
 
-void Model::run_step_batch(const std::vector<uint32_t>& token_ids, size_t position) {
+void Model::run_step_batch(const std::vector<uint32_t>& token_ids, const std::vector<size_t>& positions) {
     for (size_t b = 0; b < token_ids.size(); ++b) {
         write_int_input_at(*encoder_, "input_ids", b, static_cast<int64_t>(token_ids[b]));
-        write_int_input_at(*encoder_, "position_ids", b, static_cast<int64_t>(position));
+        write_int_input_at(*encoder_, "position_ids", b, static_cast<int64_t>(positions[b]));
     }
     encoder_->graph->execute();
     copy_component_outputs_to_inputs(*encoder_, *decoder_);
@@ -934,10 +934,11 @@ void Model::run_step_batch(const std::vector<uint32_t>& token_ids, size_t positi
     maybe_capture_handoff_probe_hidden(*decoder_);
 }
 
-std::vector<std::vector<uint32_t>> Model::decode_batch(const std::vector<uint32_t>& seed_tokens,
-                                                       size_t max_new_tokens) {
-    size_t batch = seed_tokens.size();
+std::vector<std::vector<uint32_t>> Model::generate_batch(const std::vector<std::vector<uint32_t>>& prompts,
+                                                         size_t max_new_tokens) {
+    size_t batch = prompts.size();
     if (batch == 0 || !encoder_ || !decoder_ || decode_route_ != DecodeRoute::CACHED_STEP) return {};
+    for (const auto& p : prompts) if (p.empty()) return {};
     if (!load_component_graph(*encoder_) || !load_component_graph(*decoder_)) return {};
     if (batch > decoder_cache_num_slots()) return {};
     auto has_dynamic_input = [](Component& c) {
@@ -948,17 +949,48 @@ std::vector<std::vector<uint32_t>> Model::decode_batch(const std::vector<uint32_
         return false;
     };
     if (batch > 1 && (!has_dynamic_input(*encoder_) || !has_dynamic_input(*decoder_))) return {};
+
     reset_component_cache_states(*decoder_);
     set_component_batch(*encoder_, batch);
     set_component_batch(*decoder_, batch);
-    std::vector<std::vector<uint32_t>> streams(batch);
-    std::vector<uint32_t> current = seed_tokens;
-    for (size_t step = 0; step < max_new_tokens; ++step) {
-        run_step_batch(current, step);
-        current = argmax_component_logits_batch(*decoder_, batch);
-        for (size_t b = 0; b < batch; ++b) streams[b].push_back(current[b]);
+
+    std::vector<std::vector<uint32_t>> out(batch);
+    std::vector<size_t> fed(batch, 0);          // tokens fed so far == per-slot cache length
+    std::vector<uint32_t> last(batch, 0);
+    std::vector<bool> done(batch, false);
+    size_t remaining = batch;
+
+    std::vector<uint32_t> tokens(batch);
+    std::vector<size_t> positions(batch);
+    while (remaining > 0) {
+        for (size_t b = 0; b < batch; ++b) {
+            positions[b] = fed[b];
+            tokens[b] = (fed[b] < prompts[b].size()) ? prompts[b][fed[b]] : last[b];
+        }
+        run_step_batch(tokens, positions);
+        std::vector<uint32_t> sampled = argmax_component_logits_batch(*decoder_, batch);
+        for (size_t b = 0; b < batch; ++b) {
+            ++fed[b];
+            if (done[b]) continue;
+            if (fed[b] >= prompts[b].size()) {
+                last[b] = sampled[b];
+                out[b].push_back(sampled[b]);
+                if (out[b].size() >= max_new_tokens) {
+                    done[b] = true;
+                    --remaining;
+                }
+            }
+        }
     }
-    return streams;
+    return out;
+}
+
+std::vector<std::vector<uint32_t>> Model::decode_batch(const std::vector<uint32_t>& seed_tokens,
+                                                       size_t max_new_tokens) {
+    std::vector<std::vector<uint32_t>> prompts;
+    prompts.reserve(seed_tokens.size());
+    for (uint32_t seed : seed_tokens) prompts.push_back({seed});
+    return generate_batch(prompts, max_new_tokens);
 }
 
 #define FOR_EACH_MATCHED_OUTPUT(source, target, body) \
