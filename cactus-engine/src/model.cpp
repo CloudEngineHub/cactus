@@ -934,8 +934,23 @@ void Model::run_step_batch(const std::vector<uint32_t>& token_ids, const std::ve
     maybe_capture_handoff_probe_hidden(*decoder_);
 }
 
+std::vector<uint32_t> Model::batch_stop_token_ids() const {
+    std::vector<uint32_t> stops;
+    stops.push_back(config_.eos_token_id);
+    Tokenizer* tk = get_tokenizer();
+    auto add_if_single = [&](const std::string& s) {
+        if (!tk || s.empty()) return;
+        std::vector<uint32_t> t = tk->encode(s);
+        if (t.size() == 1) stops.push_back(t[0]);
+    };
+    if (tk) add_if_single(tk->get_default_stop_sequence());
+    if (config_.model_type == Config::ModelType::GEMMA4) add_if_single("<turn|>");
+    return stops;
+}
+
 std::vector<std::vector<uint32_t>> Model::generate_batch(const std::vector<std::vector<uint32_t>>& prompts,
-                                                         size_t max_new_tokens) {
+                                                         size_t max_new_tokens, bool stop_on_eos,
+                                                         const std::function<void(size_t, uint32_t)>* on_token) {
     size_t batch = prompts.size();
     if (batch == 0 || !encoder_ || !decoder_ || decode_route_ != DecodeRoute::CACHED_STEP) return {};
     for (const auto& p : prompts) if (p.empty()) return {};
@@ -955,10 +970,16 @@ std::vector<std::vector<uint32_t>> Model::generate_batch(const std::vector<std::
     set_component_batch(*decoder_, batch);
 
     std::vector<std::vector<uint32_t>> out(batch);
-    std::vector<size_t> fed(batch, 0);          // tokens fed so far == per-slot cache length
+    std::vector<size_t> fed(batch, 0);
     std::vector<uint32_t> last(batch, 0);
     std::vector<bool> done(batch, false);
     size_t remaining = batch;
+
+    const std::vector<uint32_t> stop_ids = stop_on_eos ? batch_stop_token_ids() : std::vector<uint32_t>{};
+    auto is_stop = [&](uint32_t t) {
+        for (uint32_t s : stop_ids) if (s == t) return true;
+        return false;
+    };
 
     std::vector<uint32_t> tokens(batch);
     std::vector<size_t> positions(batch);
@@ -974,7 +995,13 @@ std::vector<std::vector<uint32_t>> Model::generate_batch(const std::vector<std::
             if (done[b]) continue;
             if (fed[b] >= prompts[b].size()) {
                 last[b] = sampled[b];
+                if (is_stop(sampled[b])) {
+                    done[b] = true;
+                    --remaining;
+                    continue;
+                }
                 out[b].push_back(sampled[b]);
+                if (on_token) (*on_token)(b, sampled[b]);
                 if (out[b].size() >= max_new_tokens) {
                     done[b] = true;
                     --remaining;
@@ -991,6 +1018,60 @@ std::vector<std::vector<uint32_t>> Model::decode_batch(const std::vector<uint32_
     prompts.reserve(seed_tokens.size());
     for (uint32_t seed : seed_tokens) prompts.push_back({seed});
     return generate_batch(prompts, max_new_tokens);
+}
+
+size_t Model::batch_slot_capacity() {
+    if (!decoder_) return 1;
+    if (!decoder_->graph && !load_component_graph(*decoder_)) return 1;
+    return decoder_cache_num_slots();
+}
+
+std::vector<uint32_t> Model::decode_step_batch(const std::vector<uint32_t>& tokens,
+                                               const std::vector<size_t>& positions) {
+    size_t batch = tokens.size();
+    if (batch == 0 || !encoder_ || !decoder_ || decode_route_ != DecodeRoute::CACHED_STEP) return {};
+    if (!load_component_graph(*encoder_) || !load_component_graph(*decoder_)) return {};
+    set_component_batch(*encoder_, batch);
+    set_component_batch(*decoder_, batch);
+    run_step_batch(tokens, positions);
+    return argmax_component_logits_batch(*decoder_, batch);
+}
+
+void Model::reset_decode_slot(size_t slot) {
+    if (!decoder_ || !decoder_->graph) return;
+    for (const auto& state : decoder_->cache_states) {
+        for (int node_id : {state.key_node_id, state.value_node_id}) {
+            if (node_id < 0) continue;
+            if (decoder_->graph->get_node_op_type(static_cast<size_t>(node_id)) != OpType::KV_CACHE_STATE) continue;
+            const auto& desc = decoder_->graph->get_output_buffer(static_cast<size_t>(node_id));
+            void* ptr = decoder_->graph->get_output(static_cast<size_t>(node_id));
+            if (!ptr || desc.byte_size < 6 * sizeof(uint64_t)) continue;
+            auto* meta = static_cast<uint64_t*>(ptr);
+            uint64_t num_slots = meta[5] > 0 ? meta[5] : 1;
+            if (slot >= num_slots) continue;
+            size_t stride = desc.byte_size / num_slots;
+            *reinterpret_cast<uint64_t*>(static_cast<char*>(ptr) + slot * stride) = 0;
+        }
+    }
+}
+
+void Model::move_decode_slot(size_t dst_slot, size_t src_slot) {
+    if (!decoder_ || !decoder_->graph || dst_slot == src_slot) return;
+    for (const auto& state : decoder_->cache_states) {
+        for (int node_id : {state.key_node_id, state.value_node_id}) {
+            if (node_id < 0) continue;
+            if (decoder_->graph->get_node_op_type(static_cast<size_t>(node_id)) != OpType::KV_CACHE_STATE) continue;
+            const auto& desc = decoder_->graph->get_output_buffer(static_cast<size_t>(node_id));
+            void* ptr = decoder_->graph->get_output(static_cast<size_t>(node_id));
+            if (!ptr || desc.byte_size < 6 * sizeof(uint64_t)) continue;
+            auto* meta = static_cast<uint64_t*>(ptr);
+            uint64_t num_slots = meta[5] > 0 ? meta[5] : 1;
+            if (dst_slot >= num_slots || src_slot >= num_slots) continue;
+            size_t stride = desc.byte_size / num_slots;
+            char* base = static_cast<char*>(ptr);
+            std::memcpy(base + dst_slot * stride, base + src_slot * stride, stride);
+        }
+    }
 }
 
 #define FOR_EACH_MATCHED_OUTPUT(source, target, body) \

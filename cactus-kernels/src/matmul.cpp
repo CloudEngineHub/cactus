@@ -2004,7 +2004,6 @@ static bool cactus_quant_orthogonal_interleaved_lmhead_matmul(
     const size_t panel_bytes = static_cast<size_t>(4) * packed_group_bytes;
     const size_t N_blocks = N / 4;
 
-    // Rotate + INT8-quantize each of the M activation rows once.
     thread_local std::vector<float> ar32;
     thread_local std::vector<int8_t> act_i8;
     thread_local std::vector<float> act_scales;
@@ -2065,7 +2064,6 @@ static bool cactus_quant_orthogonal_interleaved_lmhead_matmul(
                     acc_b[mi] = vdupq_n_s32(0);
                 }
                 for (uint32_t kb = 0; kb < K; kb += 16) {
-                    // Decode this weight block once, reuse across all M activation rows.
                     const uint8x16_t p0 = vld1q_u8(panel + (kb / 8 + 0) * 16);
                     const int8x16_t w0 = vqtbl1q_s8(cb_lut, vandq_u8(p0, lo_mask));
                     const int8x16_t w1 = vqtbl1q_s8(cb_lut, vshrq_n_u8(p0, 4));
@@ -2338,9 +2336,6 @@ static void cactus_quant_interleaved4_gemv_blocks(
     }
 }
 
-// Batched (M>1) interleaved 4-bit GEMM. Decodes each weight block on the fly (packed
-// 4-bit, half the bytes of the expanded layout) once and reuses it across all M
-// activation rows — so the weight bandwidth is amortized across the batch.
 static void cactus_quant_interleaved4_gemm_blocks(
     const CactusQuantMatrix* W, const uint8_t* packed_interleaved,
     const __fp16* norms_interleaved, const int8_t* act_i8, const float* act_scales,
