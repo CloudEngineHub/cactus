@@ -58,22 +58,6 @@ CACTUS_FFI_EXPORT int cactus_prefill(
     size_t pcm_buffer_size                 // optional: 0 when not used
 );
 
-CACTUS_FFI_EXPORT int cactus_batch_start(
-    cactus_model_t model, 
-    size_t max_slots
-);
-
-CACTUS_FFI_EXPORT uint64_t cactus_submit(
-    cactus_model_t model,
-    const uint32_t* prompt_tokens,
-    size_t num_tokens,
-    size_t max_tokens,
-    cactus_token_callback callback,         // optional; fires per token, then once with NULL on completion
-    void* user_data                         // optional
-);
-CACTUS_FFI_EXPORT int cactus_cancel(cactus_model_t model, uint64_t request_id);
-CACTUS_FFI_EXPORT void cactus_batch_stop(cactus_model_t model);
-
 CACTUS_FFI_EXPORT int cactus_tokenize(
     cactus_model_t model,
     const char* text,

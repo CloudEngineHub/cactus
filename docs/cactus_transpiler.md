@@ -409,14 +409,17 @@ cactus convert <model-id-or-path> [output-dir] [options]
 
 Quantizes the weights to CQ and builds the runtime graph. Pass `--weights-only` to
 stop after the CQ weights. The graph-build options below are the same ones the
-transpiler accepts:
+transpiler accepts.
+
+The decoder graph is emitted with a dynamic batch axis and a single baked KV-cache
+slot, so single-stream decode stays lean while fixed-batch decode (`decode_batch` /
+`generate_batch`) can size the KV-cache slot pool at runtime via
+`Model::set_decode_slots(N)`. No separate conversion flag is needed.
 
 | Option | Description |
 |--------|-------------|
 | `--bits 1\|2\|3\|4` | CQ quantization bits (default: 4) |
 | `--weights-only` | Stop after CQ quantization; skip the runtime graph |
-| `--dynamic-batch` | Emit a dynamic-batch decoder graph for batched/continuous decode (Gemma4) |
-| `--max-slots <N>` | KV-cache slot-pool capacity for batched decode (with `--dynamic-batch`) |
 | `--weights-dir <path>` | Path to converted CQ weights (default: `weights/<model_name>`) |
 | `--task <name>` | Force task type (default: `auto` — inferred from model config). Choices: `causal_lm_logits`, `multimodal_causal_lm_logits`, `ctc_logits`, `encoder_hidden_states`, `seq2seq_transcription`, `tdt_transcription` |
 | `--prompt <text>` | Representative prompt for shape capture |

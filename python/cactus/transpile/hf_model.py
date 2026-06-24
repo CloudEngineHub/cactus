@@ -2952,23 +2952,6 @@ def main() -> int:
         ),
     )
     parser.add_argument(
-        "--dynamic-batch",
-        action="store_true",
-        help=(
-            "Mark the Gemma4 decoder_step batch axis dynamic so the emitted graph runs any "
-            "batch at runtime (for batched/continuous decode). Default off."
-        ),
-    )
-    parser.add_argument(
-        "--max-slots",
-        type=int,
-        default=1,
-        help=(
-            "KV-cache slot-pool capacity (max concurrent sequences) for batched decode. "
-            "Only used with --dynamic-batch; the decoder_step caches are sized for this many slots."
-        ),
-    )
-    parser.add_argument(
         "--npu",
         action="store_true",
         help="Also emit CoreML .mlpackage(s) for Apple Neural Engine audio + vision encoders.",
@@ -3234,8 +3217,6 @@ def main() -> int:
         weights_dir=weights_dir,
         inputs_metadata=prepared.metadata,
         cache_context_length=args.cache_context_length,
-        dynamic_batch=getattr(args, "dynamic_batch", False),
-        max_slots=getattr(args, "max_slots", 1),
     )
     try:
         component_specs = build_component_module_specs(

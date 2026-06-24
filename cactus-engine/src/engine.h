@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <atomic>
 #include <limits>
-#include <functional>
 
 #include "cactus_graph.h"
 #include "kv_compress.h"
@@ -638,15 +637,11 @@ public:
     std::vector<std::vector<uint32_t>> decode_batch(const std::vector<uint32_t>& seed_tokens,
                                                     size_t max_new_tokens);
     std::vector<std::vector<uint32_t>> generate_batch(const std::vector<std::vector<uint32_t>>& prompts,
-                                                      size_t max_new_tokens, bool stop_on_eos = false,
-                                                      const std::function<void(size_t, uint32_t)>* on_token = nullptr);
+                                                      size_t max_new_tokens, bool stop_on_eos = false);
 
-    size_t batch_slot_capacity();
+    bool supports_dynamic_batch();
+    void set_decode_slots(size_t num_slots);
     std::vector<uint32_t> batch_stop_token_ids() const;
-    std::vector<uint32_t> decode_step_batch(const std::vector<uint32_t>& tokens,
-                                            const std::vector<size_t>& positions);
-    void reset_decode_slot(size_t slot);
-    void move_decode_slot(size_t dst_slot, size_t src_slot);
 
     void prefill(const std::vector<uint32_t>& tokens, size_t chunk_size = 128, const std::string& profile_file = "",
                  bool prepare_decode = true);

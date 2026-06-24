@@ -4299,7 +4299,7 @@ def _build_gemma4_multimodal_component_specs(
     weights_dir: str | None,
     components: tuple[str, ...] | None = None,
     cache_context_length: str | int | None = None,
-    dynamic_batch: bool = False,
+    dynamic_batch: bool = True,
     max_slots: int = 1,
 ) -> list[ComponentModuleSpec]:
     pixel_values = named_tensors.get("pixel_values")
@@ -6934,7 +6934,7 @@ def build_component_module_specs(
     inputs_metadata: dict[str, object] | None = None,
     components: tuple[str, ...] | None = None,
     cache_context_length: str | int | None = None,
-    dynamic_batch: bool = False,
+    dynamic_batch: bool = True,
     max_slots: int = 1,
 ) -> list[ComponentModuleSpec] | None:
     family = _family_key(model)

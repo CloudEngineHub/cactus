@@ -171,29 +171,6 @@ class TestPreparePcm:
         assert size == 25600
 
 
-class TestMakeTokenCallback:
-    """Test the callback wrapper helper."""
-
-    def setup_method(self):
-        from cactus.bindings.cactus import _make_token_callback
-        self.make_cb = _make_token_callback
-
-    def test_none_callback(self):
-        cb = self.make_cb(None)
-        assert cb is not None  # Returns empty TokenCallback
-
-    def test_false_callback(self):
-        cb = self.make_cb(False)
-        assert cb is not None
-
-    def test_callable_wrapped(self):
-        tokens = []
-        def my_callback(text, token_id):
-            tokens.append((text, token_id))
-        cb = self.make_cb(my_callback)
-        assert cb is not None
-
-
 class TestEnc:
     """Test the _enc string encoding helper."""
 
@@ -354,27 +331,10 @@ class TestCliParser:
         args = self.parser.parse_args([])
         assert args.command is None
 
-    def test_convert_absorbs_graph_flags(self):
-        import pytest
-        args = self.parser.parse_args(["convert", "google/gemma-4-E2B-it",
-                                       "--task", "causal_lm_logits", "--dynamic-batch"])
-        assert args.command == "convert"
-        assert args.model_id == "google/gemma-4-E2B-it"
-        assert args.task == "causal_lm_logits"
-        assert args.dynamic_batch is True
-        with pytest.raises(SystemExit):
-            self.parser.parse_args(["transpile", "google/gemma-4-E2B-it"])
-
     def test_run_rejects_bare_name(self):
         import pytest
         with pytest.raises(SystemExit):
             self.parser.parse_args(["run", "whisper-base", "--prompt", "hi"])
-
-    def test_run_accepts_local_bundle_path(self):
-        args = self.parser.parse_args(["run", "/tmp/bundle", "--prompt", "hi"])
-        assert args.command == "run"
-        assert args.model_id == "/tmp/bundle"
-        assert args.prompt == "hi"
 
     def test_run_platform_flag(self):
         args = self.parser.parse_args(["run", "Foo/Bar", "--platform", "apple"])

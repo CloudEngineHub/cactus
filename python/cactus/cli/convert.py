@@ -167,10 +167,6 @@ def cmd_transpile(args):
             extra_args.extend(["--npu-vision-quantize", str(args.npu_vision_quantize)])
     if args.cache_context_length is not None:
         extra_args.extend(["--cache-context-length", str(args.cache_context_length)])
-    if getattr(args, "dynamic_batch", False):
-        extra_args.append("--dynamic-batch")
-    if getattr(args, "max_slots", 1) and int(args.max_slots) != 1:
-        extra_args.extend(["--max-slots", str(args.max_slots)])
 
     return run_transpile(
         args.model_id,

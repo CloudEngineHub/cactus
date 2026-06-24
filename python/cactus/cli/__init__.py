@@ -192,8 +192,6 @@ def create_parser():
     --reconvert                        force weight conversion from source
     --lora <path>                      merge a LoRA adapter before converting
     --weights-only                     stop after CQ weights (skip the graph)
-    --dynamic-batch                    emit a dynamic-batch decoder graph (Gemma4)
-    --max-slots <n>                    KV-cache slot capacity for batched decode
     --weights-dir <path>              path to CQ weights (default: weights/<model>)
     --task <auto|...>                  task (default: auto, inferred from config)
     --artifact-dir <path>              write bundle here (default: weights/<model>)
@@ -361,11 +359,6 @@ def create_parser():
                                 help="Avoid loading checkpoint tensors during graph capture")
     convert_parser.add_argument("--weights-only", action="store_true",
                                 help="Only quantize weights; skip building the runtime graph bundle")
-    convert_parser.add_argument("--dynamic-batch", action="store_true",
-                                help="Emit a dynamic-batch decoder graph for batched/continuous decode (Gemma4)")
-    convert_parser.add_argument("--max-slots", type=int, default=1,
-                                help="KV-cache slot-pool capacity for batched decode; used with --dynamic-batch")
-
     convert_parser.add_argument("--weights-dir",
                                 help="CQ weights directory (default: weights/<model>)")
     convert_parser.add_argument("--task", default="auto",

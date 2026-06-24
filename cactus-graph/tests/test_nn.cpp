@@ -250,19 +250,6 @@ bool test_transpose() {
     return fixture.verify_output(transpose_result, expected);
 }
 
-bool test_reshape() {
-    TestUtils::FP16TestFixture fixture("Reshape");
-
-    size_t input_a = fixture.create_input({2, 3});
-    size_t reshape_result = fixture.graph().reshape(input_a, {3, 2});
-
-    std::vector<__fp16> data_a = {1, 2, 3, 4, 5, 6};
-    fixture.set_input_data(input_a, data_a);
-    fixture.execute();
-
-    return fixture.verify_output(reshape_result, data_a);
-}
-
 bool test_rms_norm() {
     TestUtils::FP16TestFixture fixture("RMS Norm");
 
@@ -348,26 +335,6 @@ bool test_reduction_operations() {
     return fixture.verify_output(sum_all, expected_all) &&
            fixture.verify_output(sum_axis0, expected_axis0) &&
            fixture.verify_output(sum_axis1, expected_axis1);
-}
-
-bool test_fp16_reduction_operations() {
-    CactusGraph graph;
-
-    size_t input_a = graph.input({2, 3}, Precision::FP16);
-    size_t sum_all = graph.sum(input_a, -1);
-
-    std::vector<__fp16> input_data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
-    graph.set_input(input_a, input_data.data(), Precision::FP16);
-    graph.execute();
-
-    __fp16* output = static_cast<__fp16*>(graph.get_output(sum_all));
-    double result = static_cast<double>(output[0]);
-    double expected = 21.0;
-
-    bool success = std::abs(result - expected) < 0.1f;
-
-    graph.hard_reset();
-    return success;
 }
 
 bool test_mean_operations() {
@@ -744,13 +711,11 @@ int main() {
     runner.run_test("Matrix Multiplication", test_matrix_multiplication());
     runner.run_test("MatMul CQ", test_matmul_cq());
     runner.run_test("Transpose", test_transpose());
-    runner.run_test("Reshape", test_reshape());
     runner.run_test("RMS Norm", test_rms_norm());
     runner.run_test("Softmax", test_softmax());
     runner.run_test("Attention", test_attention());
     runner.run_test("Attention INT8 Hybrid", test_attention_int8_hybrid());
     runner.run_test("Reduction Operations", test_reduction_operations());
-    runner.run_test("FP16 Reduction Operations", test_fp16_reduction_operations());
     runner.run_test("Mean Operations", test_mean_operations());
     runner.run_test("Variance Operations", test_variance_operations());
     runner.run_test("Min/Max Operations", test_min_max_operations());

@@ -722,6 +722,7 @@ public:
     size_t get_node_window_size(size_t node_id) const;
     size_t get_node_sink_size(size_t node_id) const;
     size_t get_node_cache_num_slots(size_t node_id) const;
+    void resize_cache_slots(size_t node_id, size_t num_slots);
     void steal_cache_buffer(size_t dst_node, CactusGraph& src, size_t src_node);
     void shrink_cache_buffer(size_t node_id, size_t new_capacity);
     std::vector<uint8_t> snapshot_cache_padded_append(size_t node_id, size_t real_tokens, size_t pad_tokens) const;
@@ -731,6 +732,7 @@ public:
     size_t get_node_count() const;
     void set_runtime_input_shape(size_t node_id, const std::vector<size_t>& shape);
     void set_input_dynamic_dims(size_t node_id, const std::vector<uint8_t>& dynamic_dims);
+    bool has_dynamic_shapes() const { return has_dynamic_shapes_; }
 
     std::vector<std::unique_ptr<GraphNode>> nodes_;
     std::unordered_map<size_t, size_t> node_index_map_;

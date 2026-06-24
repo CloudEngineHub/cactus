@@ -227,8 +227,6 @@ graph.hard_reset();
 │    --reconvert                       force local rebuild from source           │
 │    --lora <path>                     merge a LoRA adapter before converting    │
 │    --weights-only                    stop after CQ weights (skip the graph)    │
-│    --dynamic-batch                   dynamic-batch decoder graph (Gemma4)      │
-│    --max-slots <n>                   KV-cache slots for batched decode         │
 │    --artifact-dir <path>             bundle output (default: weights/<model>)  │
 │                                                                                │
 │  cactus serve [model]                OpenAI-compatible local HTTP server       │

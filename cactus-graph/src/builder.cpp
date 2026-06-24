@@ -1260,6 +1260,12 @@ size_t CactusGraph::get_node_cache_num_slots(size_t node_id) const {
     return nodes_[node_index_map_.at(node_id)]->params.cache_num_slots;
 }
 
+void CactusGraph::resize_cache_slots(size_t node_id, size_t num_slots) {
+    GraphNode& node = *nodes_[node_index_map_.at(node_id)];
+    node.params.cache_num_slots = num_slots;
+    node.output_buffer.data.reset();
+}
+
 size_t CactusGraph::persistent(size_t source_node) {
     const auto& source_buffer = get_output_buffer(source_node);
     OpParams params;

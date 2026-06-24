@@ -132,13 +132,13 @@ def test_cli_convert_absorbs_graph_flags() -> None:
     parser = cli.create_parser()
     args = parser.parse_args(["convert", "google/gemma-4-E2B-it",
                               "--weights-dir", "/tmp/x", "--task", "causal_lm_logits",
-                              "--dynamic-batch", "--max-slots", "8"])
+                              "--cache-context-length", "4096", "--component-pipeline", "on"])
     assert args.command == "convert"
     assert args.model_id == "google/gemma-4-E2B-it"
     assert args.weights_dir == "/tmp/x"
     assert args.task == "causal_lm_logits"
-    assert args.dynamic_batch is True
-    assert args.max_slots == 8
+    assert args.cache_context_length == "4096"
+    assert args.component_pipeline == "on"
 
     with pytest.raises(SystemExit):
         parser.parse_args(["transpile", "google/gemma-4-E2B-it"])

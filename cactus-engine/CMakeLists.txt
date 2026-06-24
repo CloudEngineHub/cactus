@@ -28,7 +28,6 @@ set(ENGINE_SOURCES
     src/init.cpp
     src/embed.cpp
     src/complete.cpp
-    src/batch_scheduler.cpp
     src/transcribe.cpp
     src/stream.cpp
     src/tokenizer.cpp
