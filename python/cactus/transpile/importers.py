@@ -112,6 +112,13 @@ def extract_literals(value: Any) -> Any:
     return None
 
 
+def require_literal_bool(arg: Any, ctx: "ImportContext", name: str) -> bool:
+    literal = extract_literals(arg)
+    if not isinstance(literal, (bool, int)):
+        ctx.fail(f"{name} must be a boolean literal, got {literal!r}")
+    return bool(literal)
+
+
 def make_prefixed_node(node: Any, prefix: str) -> Any:
     return SimpleNamespace(
         name=f"{prefix}{node.name}",
@@ -365,7 +372,10 @@ def import_get_attr(
     source_name: str | None = None,
 ) -> None:
     add_value_if_missing(ir, IRValue(id=value_id(node, ctx), shape=shape, dtype=dtype, producer=None))
-    ir.constants[value_id(node, ctx)] = value.detach().cpu() if isinstance(value, torch.Tensor) else value
+    if isinstance(value, torch.Tensor):
+        ir.constants[value_id(node, ctx)] = value if value.is_meta else value.detach().cpu()
+    else:
+        ir.constants[value_id(node, ctx)] = value
     ir.values[value_id(node, ctx)].meta["source_name"] = source_name
     if source_name is not None:
         bindings = ir.meta.setdefault("weight_bindings", {})
@@ -1654,6 +1664,32 @@ def import_ones(ir: IRGraph, node: Any, ctx: ImportContext, *, shape: tuple[int,
     register_node(ir, ir_node, shape=shape or output_shape, dtype=node_dtype)
 
 
+def import_new_empty(ir: IRGraph, node: Any, ctx: ImportContext, *, shape: tuple[int, ...] | None, dtype: str | None, torch_op: str) -> None:
+    output_shape = _try_materialize_shape(shape)
+    if output_shape is None and len(node.args) > 1:
+        output_shape = _extract_int_sequence_literal(node.args[1])
+    if output_shape is None:
+        ctx.fail(f"unsupported new_empty shape for {torch_op}: {node.args!r}")
+    elif math.prod(output_shape) != 0:
+        ctx.fail(f"new_empty requires an empty (zero-numel) shape, got {output_shape} for {torch_op}")
+
+    node_dtype = dtype
+    if "dtype" in getattr(node, "kwargs", {}) and extract_literals(node.kwargs["dtype"]) is not None:
+        node_dtype = dtype_to_ir(extract_literals(node.kwargs["dtype"]))
+    if node_dtype is None:
+        node_dtype = "fp32"
+
+    ir_node = IRNode(
+        id=node_id(node),
+        op="new_empty",
+        inputs=[],
+        outputs=[value_id(node, ctx)],
+        attrs={"shape": output_shape, "dtype": node_dtype},
+        meta=_base_meta(shape or output_shape, node_dtype, torch_op, node),
+    )
+    register_node(ir, ir_node, shape=shape or output_shape, dtype=node_dtype)
+
+
 def import_layer_norm(ir: IRGraph, node: Any, ctx: ImportContext, *, shape: tuple[int, ...] | None, dtype: str | None, torch_op: str) -> None:
     if not node.args:
         ctx.fail(f"unsupported layer_norm signature for {torch_op}: {node.args!r}")
@@ -1773,6 +1809,57 @@ def import_getitem(ir: IRGraph, node: Any, ctx: ImportContext, *, shape: tuple[i
     register_node(ir, ir_node, shape=shape, dtype=dtype)
 
 
+def _import_moe_layer_gated(ir, node, ctx, *, shape, dtype, torch_op, op, has_expert_bias, activation):
+    num_leading = 3 if has_expert_bias else 2
+    num_args = num_leading + 8 + (1 if has_expert_bias else 0)
+    if len(node.args) != num_args:
+        ctx.fail(f"{op} expected {num_args} args, got {len(node.args)}")
+    w1_inputs = extract_input_ids(node.args[num_leading], ctx)
+    w3_inputs = extract_input_ids(node.args[num_leading + 1], ctx)
+    w2_inputs = extract_input_ids(node.args[num_leading + 2], ctx)
+    num_experts = int(extract_literals(node.args[num_leading + 3]))
+    num_experts_per_tok = int(extract_literals(node.args[num_leading + 4]))
+    if len(w1_inputs) != num_experts or len(w3_inputs) != num_experts or len(w2_inputs) != num_experts:
+        ctx.fail(
+            f"{op} expert input count mismatch: "
+            f"num_experts={num_experts} w1={len(w1_inputs)} w3={len(w3_inputs)} w2={len(w2_inputs)}"
+        )
+    flags = num_leading + 5
+    attrs = {"num_experts": num_experts, "num_experts_per_tok": num_experts_per_tok}
+    if has_expert_bias:
+        attrs["use_expert_bias"] = require_literal_bool(node.args[flags], ctx, "use_expert_bias")
+        flags += 1
+    attrs["normalize_routing"] = require_literal_bool(node.args[flags], ctx, "normalize_routing")
+    attrs["epsilon"] = float(extract_literals(node.args[flags + 1]))
+    attrs["routed_scaling_factor"] = float(extract_literals(node.args[flags + 2]))
+    attrs["activation"] = activation
+    leading_inputs = [value_id(node.args[i], ctx) for i in range(num_leading)]
+    ir_node = IRNode(
+        id=node_id(node),
+        op=op,
+        inputs=[*leading_inputs, *w1_inputs, *w3_inputs, *w2_inputs],
+        outputs=[value_id(node, ctx)],
+        attrs=attrs,
+        meta=_base_meta(shape, dtype, torch_op, node),
+    )
+    register_node(ir, ir_node, shape=shape, dtype=dtype)
+
+
+def import_lfm2_moe_layer_gated(ir, node, ctx, *, shape, dtype, torch_op):
+    _import_moe_layer_gated(ir, node, ctx, shape=shape, dtype=dtype, torch_op=torch_op,
+                            op="lfm2_moe_layer_gated", has_expert_bias=True, activation="silu")
+
+
+def import_qwen2_moe_layer_gated(ir, node, ctx, *, shape, dtype, torch_op):
+    _import_moe_layer_gated(ir, node, ctx, shape=shape, dtype=dtype, torch_op=torch_op,
+                            op="qwen2_moe_layer_gated", has_expert_bias=False, activation="silu")
+
+
+def import_gemma4_moe_layer_gated(ir, node, ctx, *, shape, dtype, torch_op):
+    _import_moe_layer_gated(ir, node, ctx, shape=shape, dtype=dtype, torch_op=torch_op,
+                            op="gemma4_moe_layer_gated", has_expert_bias=False, activation="gelu")
+
+
 OP_IMPORTERS = {
     "arange": import_arange,
     "identity": import_identity,
@@ -1851,6 +1938,7 @@ OP_IMPORTERS = {
     "unbind": import_unbind,
     "aten.unbind.int": import_unbind,
     "ones": import_ones,
+    "new_empty": import_new_empty,
     "pad": import_pad,
     "pow": import_pow,
     "aten.diff.default": import_diff,
@@ -1866,4 +1954,7 @@ OP_IMPORTERS = {
     "batch_norm": import_batch_norm,
     "contiguous": import_contiguous,
     "getitem": import_getitem,
+    "lfm2_moe_layer_gated": import_lfm2_moe_layer_gated,
+    "qwen2_moe_layer_gated": import_qwen2_moe_layer_gated,
+    "gemma4_moe_layer_gated": import_gemma4_moe_layer_gated,
 }

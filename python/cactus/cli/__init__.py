@@ -209,6 +209,7 @@ def create_parser():
     --torch-dtype <dtype>              float16 | float32 | bfloat16
     --trust-remote-code                allow HF remote code during the build
     --local-files-only                 require model/processor to be local
+    --low-memory-load                  graph capture with meta tensors
     --allow-unconverted-weights        debug-only: skip the CQ-weights check
     --execute-after-transpile          run a reference execution after building
     --graph-filename <name>            override saved graph filename
@@ -354,6 +355,10 @@ def create_parser():
                                 help="Path or HF id of a LoRA adapter to merge before converting (requires `peft`)")
     convert_parser.add_argument("--reconvert", action="store_true",
                                 help="Force conversion from source")
+    convert_parser.add_argument("--skip-model-load", action="store_true",
+                                help="Convert directly from checkpoint tensors without loading the full HF model object")
+    convert_parser.add_argument("--low-memory-load", action="store_true",
+                                help="Avoid loading checkpoint tensors during graph capture")
     convert_parser.add_argument("--weights-only", action="store_true",
                                 help="Only quantize weights; skip building the runtime graph bundle")
     convert_parser.add_argument("--dynamic-batch", action="store_true",

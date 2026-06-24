@@ -44,9 +44,16 @@ _EXACT_RULES: dict[str, str] = {
     "aten.view.default": "reshape",
     "aten.reshape.default": "reshape",
     "aten._unsafe_view.default": "reshape",
+    "aten.new_empty.default": "new_empty",
     "aten.flatten.using_ints": "flatten",
     "aten.t.default": "transpose",
     "aten.gelu.erf": "gelu_erf",
+    "cactus_transpile.lfm2_moe_layer_gated.default": "lfm2_moe_layer_gated",
+    "lfm2_moe_layer_gated.default": "lfm2_moe_layer_gated",
+    "cactus_transpile.qwen2_moe_layer_gated.default": "qwen2_moe_layer_gated",
+    "qwen2_moe_layer_gated.default": "qwen2_moe_layer_gated",
+    "cactus_transpile.gemma4_moe_layer_gated.default": "gemma4_moe_layer_gated",
+    "gemma4_moe_layer_gated.default": "gemma4_moe_layer_gated",
     # Keep the legacy importer key until the importer itself is renamed.
     "aten.diff.default": "aten.diff.default",
 }
