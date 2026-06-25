@@ -924,6 +924,15 @@ size_t Model::decoder_cache_num_slots() {
 }
 
 void Model::run_step_batch(const std::vector<uint32_t>& token_ids, const std::vector<size_t>& positions) {
+    if (decode_route_ == DecodeRoute::DIRECT_DECODER_STEP) {
+        for (size_t b = 0; b < token_ids.size(); ++b) {
+            write_int_input_at(*decoder_, "input_ids", b, static_cast<int64_t>(token_ids[b]));
+            write_int_input_at(*decoder_, "position_ids", b, static_cast<int64_t>(positions[b]));
+        }
+        decoder_->graph->execute();
+        maybe_capture_handoff_probe_hidden(*decoder_);
+        return;
+    }
     for (size_t b = 0; b < token_ids.size(); ++b) {
         write_int_input_at(*encoder_, "input_ids", b, static_cast<int64_t>(token_ids[b]));
         write_int_input_at(*encoder_, "position_ids", b, static_cast<int64_t>(positions[b]));
@@ -951,9 +960,13 @@ std::vector<uint32_t> Model::batch_stop_token_ids() const {
 std::vector<std::vector<uint32_t>> Model::generate_batch(const std::vector<std::vector<uint32_t>>& prompts,
                                                          size_t max_new_tokens, bool stop_on_eos) {
     size_t batch = prompts.size();
-    if (batch == 0 || !encoder_ || !decoder_ || decode_route_ != DecodeRoute::CACHED_STEP) return {};
+    const bool cached = decode_route_ == DecodeRoute::CACHED_STEP;
+    const bool direct = decode_route_ == DecodeRoute::DIRECT_DECODER_STEP;
+    if (batch == 0 || !decoder_ || (!cached && !direct)) return {};
+    if (cached && !encoder_) return {};
     for (const auto& p : prompts) if (p.empty()) return {};
-    if (!load_component_graph(*encoder_) || !load_component_graph(*decoder_)) return {};
+    if (cached && !load_component_graph(*encoder_)) return {};
+    if (!load_component_graph(*decoder_)) return {};
     if (batch > decoder_cache_num_slots()) return {};
     auto has_dynamic_input = [](Component& c) {
         for (int node_id : c.runtime_input_node_ids) {
@@ -962,10 +975,16 @@ std::vector<std::vector<uint32_t>> Model::generate_batch(const std::vector<std::
         }
         return false;
     };
-    if (batch > 1 && (!has_dynamic_input(*encoder_) || !has_dynamic_input(*decoder_))) return {};
+    if (batch > 1) {
+        if (!has_dynamic_input(*decoder_)) return {};
+        if (cached && !has_dynamic_input(*encoder_)) return {};
+        for (const auto& np : decoder_->graph->nodes_) {
+            if (np->op_type == OpType::CONV_CACHE_STATE || np->op_type == OpType::RECURRENT_CACHE_STATE) return {};
+        }
+    }
 
     reset_component_cache_states(*decoder_);
-    set_component_batch(*encoder_, batch);
+    if (cached) set_component_batch(*encoder_, batch);
     set_component_batch(*decoder_, batch);
 
     std::vector<std::vector<uint32_t>> out(batch);

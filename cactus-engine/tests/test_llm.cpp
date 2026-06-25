@@ -47,6 +47,18 @@ static cactus_model_t load_gemma4_or_skip() {
     return model;
 }
 
+static cactus_model_t load_dynamic_batch_model_or_skip() {
+    if (!g_model_path) { std::cout << "  [WARN] CACTUS_TEST_MODEL not set; skipping\n"; return nullptr; }
+    cactus_model_t model = cactus_init(g_model_path, nullptr, false);
+    if (!model) { std::cout << "  [WARN] Could not load model; skipping\n"; return nullptr; }
+    if (!static_cast<CactusModelHandle*>(model)->model->supports_dynamic_batch()) {
+        std::cout << "  [WARN] model is not dynamic-batch capable (reconvert with `cactus convert`); skipping\n";
+        cactus_destroy(model);
+        return nullptr;
+    }
+    return model;
+}
+
 static const char* g_options = R"({
         "max_tokens": 256,
     "stop_sequences": ["<|im_end|>", "<end_of_turn>"],
@@ -866,7 +878,7 @@ bool test_decode_batch() {
     std::cout << "\n╔══════════════════════════════════════════╗\n"
               << "║" << std::setw(42) << std::left << "            DECODE BATCH TEST" << "║\n"
               << "╚══════════════════════════════════════════╝\n";
-    cactus_model_t model = load_gemma4_or_skip();
+    cactus_model_t model = load_dynamic_batch_model_or_skip();
     if (!model) return true;
 
     auto* handle = static_cast<CactusModelHandle*>(model);
@@ -915,7 +927,7 @@ bool test_generate_batch_ragged() {
     std::cout << "\n╔══════════════════════════════════════════╗\n"
               << "║" << std::setw(42) << std::left << "        GENERATE BATCH RAGGED TEST" << "║\n"
               << "╚══════════════════════════════════════════╝\n";
-    cactus_model_t model = load_gemma4_or_skip();
+    cactus_model_t model = load_dynamic_batch_model_or_skip();
     if (!model) return true;
 
     auto* handle = static_cast<CactusModelHandle*>(model);
@@ -953,7 +965,7 @@ bool test_batch_distinct4_matches_single() {
     std::cout << "\n╔══════════════════════════════════════════╗\n"
               << "║" << std::setw(42) << std::left << "     BATCH DISTINCT-4 VS SINGLE TEST" << "║\n"
               << "╚══════════════════════════════════════════╝\n";
-    cactus_model_t model = load_gemma4_or_skip();
+    cactus_model_t model = load_dynamic_batch_model_or_skip();
     if (!model) return true;
 
     auto* handle = static_cast<CactusModelHandle*>(model);
@@ -995,7 +1007,7 @@ bool test_batch_distinct4_matches_single() {
 }
 
 bool test_decode_batch_throughput() {
-    cactus_model_t model = load_gemma4_or_skip();
+    cactus_model_t model = load_dynamic_batch_model_or_skip();
     if (!model) return true;
 
     auto* handle = static_cast<CactusModelHandle*>(model);
@@ -1061,7 +1073,7 @@ int main() {
     runner.run_test("decode_batch", test_decode_batch());
     runner.run_test("generate_batch_ragged", test_generate_batch_ragged());
     runner.run_test("batch_distinct4_matches_single", test_batch_distinct4_matches_single());
-    // runner.run_test("decode_batch_throughput", test_decode_batch_throughput());
+    runner.run_test("decode_batch_throughput", test_decode_batch_throughput());
     runner.print_summary();
     return runner.all_passed() ? 0 : 1;
 }

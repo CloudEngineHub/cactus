@@ -4161,6 +4161,8 @@ def _build_gemma3_causal_lm_component_specs(
     weights_dir: str | None = None,
     components: tuple[str, ...] | None = None,
     cache_context_length: str | int | None = None,
+    dynamic_batch: bool = True,
+    max_slots: int = 1,
 ) -> list[ComponentModuleSpec] | None:
     input_ids = named_tensors.get("input_ids")
     if input_ids is None:
@@ -4229,6 +4231,7 @@ def _build_gemma3_causal_lm_component_specs(
             output_keys=("inputs_embeds", "position_ids"),
             graph_meta={**common_graph_meta, "component": "lm_encoder_step"},
             metadata=metadata,
+            dynamic_batch_axis=0 if dynamic_batch else None,
         ))
     if "lm_encoder_text_chunk" in requested_set:
         specs.append(ComponentModuleSpec(
@@ -4270,8 +4273,10 @@ def _build_gemma3_causal_lm_component_specs(
                 **common_graph_meta,
                 **cached_graph_meta,
                 "component": "decoder_step",
+                "cache_num_slots": (max_slots if dynamic_batch else 1),
             },
             metadata=metadata,
+            dynamic_batch_axis=0 if dynamic_batch else None,
         ))
     return specs
 
@@ -5463,6 +5468,8 @@ def _build_qwen_causal_lm_component_specs(
     weights_dir: str | None = None,
     components: tuple[str, ...] | None = None,
     cache_context_length: str | int | None = None,
+    dynamic_batch: bool = True,
+    max_slots: int = 1,
 ) -> list[ComponentModuleSpec] | None:
     input_ids = named_tensors.get("input_ids")
     if input_ids is None:
@@ -5525,8 +5532,10 @@ def _build_qwen_causal_lm_component_specs(
                 "use_internal_gated_deltanet_cache": True,
                 "max_cache_seq_len": max_cache_seq_len,
                 "cache_sink_size": 4,
+                "cache_num_slots": (max_slots if dynamic_batch else 1),
             },
             metadata={"family": family, "task": "causal_lm_logits"},
+            dynamic_batch_axis=0 if dynamic_batch else None,
         ))
 
     if wants_chunked:
@@ -5559,6 +5568,7 @@ def _build_qwen_causal_lm_component_specs(
                 output_keys=("inputs_embeds", "position_ids"),
                 graph_meta={**common_graph_meta, "component": "lm_encoder_step"},
                 metadata={"family": family, "task": "causal_lm_logits"},
+                dynamic_batch_axis=0 if dynamic_batch else None,
             ))
         if "lm_encoder_text_chunk" in requested_set:
             specs.append(ComponentModuleSpec(
@@ -5623,8 +5633,10 @@ def _build_qwen_causal_lm_component_specs(
                     "use_internal_gated_deltanet_cache": True,
                     "max_cache_seq_len": max_cache_seq_len,
                     "cache_sink_size": 4,
+                    "cache_num_slots": (max_slots if dynamic_batch else 1),
                 },
                 metadata={"family": family, "task": "causal_lm_logits"},
+                dynamic_batch_axis=0 if dynamic_batch else None,
             ))
     return specs
 
@@ -6953,6 +6965,8 @@ def build_component_module_specs(
             weights_dir=weights_dir,
             components=components,
             cache_context_length=cache_context_length,
+            dynamic_batch=dynamic_batch,
+            max_slots=max_slots,
         )
     if family == "gemma3" and task == "causal_lm_logits":
         return _build_gemma3_causal_lm_component_specs(
@@ -6961,6 +6975,8 @@ def build_component_module_specs(
             weights_dir=weights_dir,
             components=components,
             cache_context_length=cache_context_length,
+            dynamic_batch=dynamic_batch,
+            max_slots=max_slots,
         )
     if family == "gemma4" and task == "multimodal_causal_lm_logits":
         return _build_gemma4_multimodal_component_specs(
