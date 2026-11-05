@@ -1,5 +1,5 @@
 [project]
-name = "cactus-compute"
+name = "cactus-engine"
 dynamic = ["version"]
 description = "On-device AI inference — LLM, vision, speech, embeddings, and RAG"
 readme = "README.md"
@@ -52,9 +52,9 @@ convert = [
 
 [project.urls]
 Homepage = "https://cactuscompute.com"
-Repository = "https://github.com/cactus-compute/cactus"
+Repository = "https://github.com/cactus-compute/engine"
 Documentation = "https://docs.cactuscompute.com"
-"Bug Tracker" = "https://github.com/cactus-compute/cactus/issues"
+"Bug Tracker" = "https://github.com/cactus-compute/engine/issues"
 
 [project.scripts]
 cactus = "cactus.cli:main"

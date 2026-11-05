@@ -30,7 +30,7 @@ def _find_library():
 
     raise RuntimeError(
         f"Cactus library ({_LIB_NAME}) not found.\n"
-        f"Install with: pip install cactus-compute\n"
+        f"Install with: pip install cactus-engine\n"
         f"Or build from source: cactus build --python"
     )
 

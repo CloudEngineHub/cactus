@@ -457,7 +457,7 @@ def main():
 
     if args.command in _REPO_ONLY and not is_repo_checkout():
         print(f"Error: `cactus {args.command}` requires a git clone of the cactus repository.")
-        print("See: https://github.com/cactus-compute/cactus")
+        print("See: https://github.com/cactus-compute/engine")
         sys.exit(1)
 
     handler = _COMMANDS.get(args.command)

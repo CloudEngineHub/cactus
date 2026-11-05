@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Bundle the built Cactus coding agent into the Python package so it ships in the
-# pypi wheel and `cactus code` works after `pip install cactus-compute`.
+# pypi wheel and `cactus code` works after `pip install cactus-engine`.
 #
 # Produces a self-contained payload at python/cactus/code/ with the four built
 # packages plus a production-only node_modules (workspace packages copied in via

@@ -2,6 +2,9 @@ name: PyPI Publish
 
 on:
   workflow_call:
+    secrets:
+      PYPI_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       version:
@@ -28,7 +31,7 @@ jobs:
       - uses: ./.github/actions/stamp-version
 
       - name: Install SDL2 (live microphone transcription)
-        run: brew install sdl2
+        run: brew install sdl2 sdl3
 
       - name: Build native library
         run: |
@@ -147,8 +150,6 @@ jobs:
     needs: [wheels-macos, wheels-linux, sdist]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    permissions:
-      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -158,4 +159,5 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
+          password: ${{ secrets.PYPI_TOKEN }}
           attestations: false

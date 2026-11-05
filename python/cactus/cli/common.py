@@ -70,7 +70,7 @@ def convert_toolchain_error():
         + ", ".join(missing) + ").\n"
         "  Converting a model from source needs it. Either:\n"
         "    - use a prebuilt model:   cactus run <model>   or   cactus download <model>\n"
-        "    - install the toolchain:  pip install \"cactus-compute[convert]\""
+        "    - install the toolchain:  pip install \"cactus-engine[convert]\""
     )
 
 

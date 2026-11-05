@@ -14,16 +14,17 @@ concurrency:
 jobs:
   pypi:
     permissions:
-      id-token: write
       contents: read
     uses: ./.github/workflows/pypi.yml
+    secrets:
+      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
 
   homebrew:
     needs: pypi
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      PACKAGE: cactus-compute
+      PACKAGE: cactus-engine
       TAP: cactus-compute/homebrew-cactus
       TAG: ${{ github.event.release.tag_name }}
     steps:

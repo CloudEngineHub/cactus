@@ -6,7 +6,13 @@ keywords: ["Python package", "Python bindings", "on-device AI", "Python FFI", "e
 
 # Cactus Python Package
 
-Python bindings for Cactus Engine via FFI. Auto-installed when you run `source ./setup`.
+Python bindings for Cactus Engine via FFI. Install with `pip install cactus-engine`.
+
+This package was previously published as `cactus-compute` through version 2.2.2.
+The Python import remains `cactus` and the command remains `cactus`.
+`cactus-compute` 3.3.0 and later provides the Needle and Whistle model package.
+To migrate an existing engine environment, run `pip uninstall cactus-compute`
+followed by `pip install cactus-engine`.
 
 > **Model bundles:** Pre-built runtime bundles for all supported models at [huggingface.co/Cactus-Compute](https://huggingface.co/Cactus-Compute).
 
@@ -14,7 +20,7 @@ Python bindings for Cactus Engine via FFI. Auto-installed when you run `source .
 
 <!-- --8<-- [start:install] -->
 ```bash
-git clone https://github.com/cactus-compute/cactus && cd cactus && source ./setup
+git clone https://github.com/cactus-compute/engine && cd engine && source ./setup
 cactus build --python
 ```
 <!-- --8<-- [end:install] -->
