@@ -1959,12 +1959,17 @@
 
 
 <h1 id="cactus-python-package">Cactus Python Package<a class="headerlink" href="#cactus-python-package" title="Permanent link">&para;</a></h1>
-<p>Python bindings for Cactus Engine via FFI. Auto-installed when you run <code>source ./setup</code>.</p>
+<p>Python bindings for Cactus Engine via FFI. Install with <code>pip install cactus-engine</code>.</p>
+<p>This package was previously published as <code>cactus-compute</code> through version 2.2.2.
+The Python import remains <code>cactus</code> and the command remains <code>cactus</code>.
+<code>cactus-compute</code> 3.3.0 and later provides the Needle and Whistle model package.
+To migrate an existing engine environment, run <code>pip uninstall cactus-compute</code>
+followed by <code>pip install cactus-engine</code>.</p>
 <blockquote>
 <p><strong>Model bundles:</strong> Pre-built runtime bundles for all supported models at <a href="https://huggingface.co/Cactus-Compute">huggingface.co/Cactus-Compute</a>.</p>
 </blockquote>
 <h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/cactus-compute/cactus<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>cactus<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>./setup
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/cactus-compute/engine<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>engine<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>./setup
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cactus<span class="w"> </span>build<span class="w"> </span>--python
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Download pre-built bundles</span>
